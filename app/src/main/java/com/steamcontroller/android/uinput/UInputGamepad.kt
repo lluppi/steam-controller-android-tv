@@ -72,9 +72,11 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     // against zero instead would leave a released key stuck down in the kernel.
     private var lastSentKeys: Int = 0
 
-    // Throttled diagnostic for the trackpad sidecar: it is silent when the touch flags never
-    // arrive, which looks exactly like "the trackpads do nothing".
+    // Diagnostic for the trackpad sidecar: it is silent when the touch flags never arrive,
+    // which looks exactly like "the trackpads do nothing". Logs on every change of the button
+    // mask (so a brief click cannot be missed) plus a slow heartbeat.
     private var lastSidecarLogMs: Long = 0
+    private var lastSidecarButtons: Int = -1
 
     private var rumbleThread: Thread? = null
 
@@ -439,8 +441,9 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         }
 
         val nowMs = android.os.SystemClock.uptimeMillis()
-        if (nowMs - lastSidecarLogMs > 1000L) {
+        if (state.buttons != lastSidecarButtons || nowMs - lastSidecarLogMs > 5000L) {
             lastSidecarLogMs = nowMs
+            lastSidecarButtons = state.buttons
             Log.i(
                 TAG,
                 "sidecar: tpAsMouse=$cachedTrackpadAsMouse " +

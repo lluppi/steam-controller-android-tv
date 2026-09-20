@@ -43,6 +43,12 @@ class BluetoothHidManager(private val context: Context) {
 
         /** How long any single handshake step may go without its callback. */
         private const val HANDSHAKE_TIMEOUT_MS = 5000L
+
+        /** Consecutive stalled handshakes before the bond is recreated as a last resort. */
+        private const val REBOND_AFTER_STALLS = 4
+
+        /** Never recreate the bond twice inside this window. */
+        private const val REBOND_COOLDOWN_MS = 120_000L
     }
 
     private enum class State { IDLE, CONNECTING, MTU_REQUESTED, DISCOVERING, SUBSCRIBING, READY }
@@ -81,6 +87,10 @@ class BluetoothHidManager(private val context: Context) {
     // Set when a handshake stalls, so the next connect clears the stack's cached GATT database
     // before re-discovering (see refreshGattCache).
     private var refreshNextConnect = false
+
+    // Counts stalls that were not interrupted by a healthy session, for the bond-escalation below.
+    private var consecutiveStalls = 0
+    private var lastRebondAt = 0L
 
     val isBluetoothAvailable: Boolean get() = adapter != null && adapter.isEnabled
 
@@ -132,7 +142,26 @@ class BluetoothHidManager(private val context: Context) {
     private fun attemptReconnect(reason: String) {
         reconnectScheduled = false
         if (!reconnectEnabled) return
-        val device = targetDevice ?: return
+        val device = resolveTarget()
+        if (device == null) {
+            // Nothing is bonded: we are sitting mid-repair (the escalation dropped the bond and the
+            // controller was not reachable to complete it). Re-arm the pairing — the backoff paces
+            // it, and a controller paired by hand simply shows up in the bonded list first.
+            targetDevice?.let { remembered ->
+                if (remembered.bondState == BluetoothDevice.BOND_NONE) {
+                    try {
+                        Log.i(
+                            TAG,
+                            "Not bonded — re-arming createBond() for ${safeName(remembered)}"
+                        )
+                        remembered.createBond()
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "createBond failed: ${t.message}")
+                    }
+                }
+            }
+            return
+        }
         reconnectAttempts++
         Log.i(TAG, "Reconnect attempt $reconnectAttempts ($reason) → ${safeName(device)}")
         state = State.CONNECTING
@@ -206,13 +235,90 @@ class BluetoothHidManager(private val context: Context) {
             if (state == State.IDLE || state == State.READY) return@Runnable
             Log.w(TAG, "Handshake stalled in $state for ${HANDSHAKE_TIMEOUT_MS}ms — retrying")
             reconnectAttempts++
+            // Only a stall *after* the link came up is the wedged-GATT signature: the controller
+            // answers at the link layer and then stops answering GATT requests. A stall while
+            // CONNECTING just means it is off, asleep or out of range, and recreating the bond for
+            // that would throw away a perfectly good pairing.
+            if (state == State.CONNECTING) {
+                consecutiveStalls = 0
+            } else {
+                consecutiveStalls++
+            }
             state = State.IDLE
             closeGatt()
             // A stalled step usually means the stack's cached handle layout is stale; drop it
             // on the way back in rather than retrying the same dead handles forever.
             refreshNextConnect = true
+            if (consecutiveStalls >= REBOND_AFTER_STALLS) {
+                escalateRebond("$consecutiveStalls consecutive handshake stalls")
+            }
             scheduleReconnect("handshake timeout")
         }
+
+    /**
+     * Recreate the bond as a last resort.
+     *
+     * A GATT session lives in the system Bluetooth process, not in the app, so a client that dies
+     * mid-session leaves the peripheral believing it is still connected: the next client connects
+     * at the link layer and then every GATT operation stalls. Closing our own client and refreshing
+     * the cached database cannot clear that — only dropping the bond does, which is exactly the
+     * unpair/re-pair ritual. Doing it here means a wedged controller can recover on its own.
+     *
+     * Re-pairing is safe to attempt without user interaction for these controllers, and the address
+     * change that follows is handled by resolveTarget(). Escalation is capped by a cooldown so a
+     * persistently failing link cannot loop on it.
+     */
+    private fun escalateRebond(reason: String) {
+        val device = targetDevice ?: return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastRebondAt < REBOND_COOLDOWN_MS) {
+            Log.w(TAG, "Link still wedged ($reason), but a re-bond was attempted recently")
+            return
+        }
+        lastRebondAt = now
+        Log.w(TAG, "Link wedged ($reason) — removing and re-creating the bond")
+        val removed = removeBond(device)
+        Log.w(TAG, "removeBond → $removed")
+        if (!removed) return
+        consecutiveStalls = 0
+        // Give the stack a moment to tear the bond down, then pair again. A fresh address follows,
+        // and resolveTarget() picks it up on the next attempt.
+        handler.postDelayed(
+            {
+                val ok =
+                    try {
+                        device.createBond()
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "createBond failed: ${t.message}")
+                        false
+                    }
+                Log.i(TAG, "createBond → $ok")
+            },
+            2500L
+        )
+    }
+
+    private fun removeBond(device: BluetoothDevice): Boolean = try {
+        (device.javaClass.getMethod("removeBond").invoke(device) as? Boolean) ?: false
+    } catch (t: Throwable) {
+        Log.w(TAG, "removeBond() unavailable: ${t.message}")
+        false
+    }
+
+    /**
+     * The device to connect to, re-resolved from the bonded list if the remembered object is no
+     * longer bonded — which is what happens after a re-pair gives the controller a new address.
+     */
+    private fun resolveTarget(): BluetoothDevice? {
+        val remembered = targetDevice ?: return null
+        if (remembered.bondState == BluetoothDevice.BOND_BONDED) return remembered
+        val replacement = listPairedSteamControllers().firstOrNull()
+        if (replacement != null) {
+            Log.i(TAG, "Re-resolved controller to ${replacement.address}")
+            targetDevice = replacement
+        }
+        return replacement
+    }
 
     /**
      * Clear this device's cached GATT database in the Bluetooth stack.
@@ -602,8 +708,10 @@ class BluetoothHidManager(private val context: Context) {
             Log.i(TAG, "All ${pendingSubs.size} subscriptions complete, sending disable lizard")
             val ch = featureWriteChar
             state = State.READY
-            // Healthy again — the next outage starts its backoff from 1s.
+            // Healthy again — the next outage starts its backoff from 1s, and a later wedge has to
+            // earn its own escalation.
             reconnectAttempts = 0
+            consecutiveStalls = 0
             if (ch == null) {
                 Log.w(TAG, "No feature write char; skipping disable lizard")
                 // Notify-only battery char never pushes until its value changes on the
