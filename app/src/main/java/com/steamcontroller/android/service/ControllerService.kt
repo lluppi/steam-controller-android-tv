@@ -46,6 +46,24 @@ class ControllerService : Service() {
         val isVirtualDevice: Boolean get() = this == UINPUT || this == UHID
     }
 
+    /** What the UI should say about the link to the controller. */
+    enum class LinkState {
+        /** Nothing usable: service not started, or no controller paired. */
+        DISCONNECTED,
+
+        /** Frames are arriving: the only state that earns a green status card. */
+        LINKED,
+
+        /**
+         * Connected at the Bluetooth level but no frames arriving. This is where the controller
+         * sits when it has gone to sleep, or when the GATT handshake stalled — the old UI showed
+         * a healthy card through both, which looks identical to a broken device.
+         */
+        STALE
+    }
+
+    data class LinkStatus(val state: LinkState, val detail: String)
+
     companion object {
         private const val TAG = "ControllerService"
         const val NOTIFICATION_ID = 1
@@ -55,6 +73,12 @@ class ControllerService : Service() {
         const val ACTION_NEXT_PROFILE = "com.steamcontroller.android.NEXT_PROFILE"
         const val ACTION_TEST_RUMBLE = "com.steamcontroller.android.TEST_RUMBLE"
         private const val TEST_RUMBLE_DURATION_MS = 5000L
+
+        /** How often the link-liveness status is recomputed. */
+        private const val LINK_POLL_MS = 1500L
+
+        /** No frames for this long means the link is not actually delivering. */
+        private const val FRAME_STALE_MS = 3000L
 
         // Observed by DebugActivity / MainActivity for live display
         private val _stateFlow = MutableStateFlow<SteamControllerState?>(null)
@@ -86,6 +110,11 @@ class ControllerService : Service() {
         // control stays usable until a backend is actually chosen.
         private val _rumbleSupportedFlow = MutableStateFlow(true)
         val rumbleSupportedFlow: StateFlow<Boolean> = _rumbleSupportedFlow.asStateFlow()
+
+        // What the UI should say about the link to the controller.
+        private val _linkStatusFlow =
+            MutableStateFlow(LinkStatus(LinkState.DISCONNECTED, "not started"))
+        val linkStatusFlow: StateFlow<LinkStatus> = _linkStatusFlow.asStateFlow()
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -100,6 +129,13 @@ class ControllerService : Service() {
     // subscription, which presents as "the controller went unresponsive".
     private var initializing = false
     private var initializedTransport: Transport? = null
+
+    // Link health. `lastFrameAt` is the only honest signal that the controller is actually there;
+    // `btConnected` is what the Bluetooth stack thinks, which can be true on a link that is
+    // delivering nothing.
+    @Volatile private var lastFrameAt = 0L
+
+    @Volatile private var btConnected = false
 
     // Diagnostic for the trackpad clicks (see onHidFrame).
     private var lastRawLogButtons = 0
@@ -145,6 +181,56 @@ class ControllerService : Service() {
         }
 
         startForegroundAppMonitor()
+
+        // Link liveness ticker. Drives the honest status card: frames in the last few seconds, or
+        // an explicit reason why not.
+        scope.launch {
+            while (isActive) {
+                refreshLinkStatus()
+                delay(LINK_POLL_MS)
+            }
+        }
+    }
+
+    /**
+     * Recompute what to tell the user about the link.
+     *
+     * Deliberately pessimistic: `LINKED` requires recent frames, because a bonded controller that
+     * is silent is indistinguishable from a broken one and the UI used to show a green card either
+     * way.
+     */
+    private fun refreshLinkStatus() {
+        val status =
+            when {
+                mode == InjectionMode.NONE ->
+                    LinkStatus(LinkState.DISCONNECTED, "service stopped")
+
+                mode == InjectionMode.SHIZUKU_INJECT ->
+                    LinkStatus(LinkState.STALE, "inject fallback — most apps ignore input")
+
+                lastFrameAt != 0L &&
+                    android.os.SystemClock.uptimeMillis() - lastFrameAt < FRAME_STALE_MS ->
+                    LinkStatus(LinkState.LINKED, "")
+
+                btManager.listPairedSteamControllers().isEmpty() ->
+                    LinkStatus(
+                        LinkState.DISCONNECTED,
+                        "no Steam Controller paired — pair it in Bluetooth settings"
+                    )
+
+                !btConnected ->
+                    LinkStatus(
+                        LinkState.DISCONNECTED,
+                        "controller not connected — press Steam to wake it"
+                    )
+
+                else ->
+                    LinkStatus(
+                        LinkState.STALE,
+                        "link stalled — controller asleep, or hold B + R1 + Steam for a blue LED"
+                    )
+            }
+        _linkStatusFlow.value = status
     }
 
     // ─── Foreground-app auto-switch (V1.2 Phase 2b) ────────────────────────────
@@ -463,7 +549,9 @@ class ControllerService : Service() {
                 onHidFrame(state, raw)
             },
             onConnectionChange = { connected ->
+                btConnected = connected
                 Log.i(TAG, "BT connection state: $connected")
+                refreshLinkStatus()
             }
         )
 
@@ -480,6 +568,11 @@ class ControllerService : Service() {
     private fun onHidFrame(state: SteamControllerState, raw: ByteArray) {
         _stateFlow.value = state
         _rawReportFlow.value = raw
+
+        // Frames are the proof of life. Flip to LINKED immediately rather than waiting for the
+        // ticker, so a reconnected controller goes green the moment it starts talking.
+        lastFrameAt = android.os.SystemClock.uptimeMillis()
+        if (_linkStatusFlow.value.state != LinkState.LINKED) refreshLinkStatus()
 
         // Diagnostic: the left trackpad click does not show up in the button field at all (the
         // mask is unchanged across left-pad clicks), so dump the whole state report whenever the

@@ -2,6 +2,10 @@
 <resources>
     <string name="app_name">Steam Controller</string>
     <string name="status_disconnected">Controller disconnected</string>
+    <string name="status_ready">Controller: Ready</string>
+    <string name="status_link_lost">Controller: link lost — %1$s</string>
+    <string name="status_disconnected_reason">Controller: disconnected — %1$s</string>
+    <string name="reconnecting">Reconnecting…</string>
     <string name="status_connected">Controller connected</string>
     <string name="status_running">Controller active</string>
     <string name="shizuku_not_running">Shizuku is not running. Please start Shizuku first.</string>

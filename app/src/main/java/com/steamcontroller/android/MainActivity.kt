@@ -34,11 +34,15 @@ import com.steamcontroller.android.update.UpdateInstaller
 import com.steamcontroller.android.usb.UsbConnectionManager
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import rikka.shizuku.Shizuku
 
 class MainActivity : AppCompatActivity() {
     private val TAG = "MainActivity"
+
+    /** Pause between stopping and restarting the service on a reconnect. */
+    private val SERVICE_RESTART_DELAY_MS = 1200L
     private lateinit var binding: ActivityMainBinding
     private var serviceRunning = false
     private var pairedBtDevices: List<BluetoothDevice> = emptyList()
@@ -85,7 +89,7 @@ class MainActivity : AppCompatActivity() {
 
                     UsbManager.ACTION_USB_DEVICE_DETACHED -> {
                         stopControllerService()
-                        updateStatus(connected = false)
+                        updateStatus()
                         log("Controller disconnected")
                     }
                 }
@@ -176,6 +180,9 @@ class MainActivity : AppCompatActivity() {
 
         setupTransportDropdown()
         setupActionCardFocusMemory()
+
+        // The status card doubles as the reconnect affordance ("link lost — tap to reconnect").
+        binding.statusPillCard?.setOnClickListener { restartService() }
         setupControlModeToggle()
         setupGamepadVariantRadios()
         requestNotificationPermissionIfNeeded()
@@ -216,7 +223,7 @@ class MainActivity : AppCompatActivity() {
                 } else if (serviceRunning && hasSeenActiveMode) {
                     serviceRunning = false
                     hasSeenActiveMode = false
-                    updateStatus(connected = false)
+                    updateStatus()
                     binding.btnToggleService.text = getString(R.string.btn_start)
                     log("Service stopped")
                 }
@@ -247,9 +254,13 @@ class MainActivity : AppCompatActivity() {
         // once at least one HID frame has been parsed from the controller. That's the
         // signal we trust for "controller actually plugged in / paired and streaming".
         lifecycleScope.launch {
-            ControllerService.stateFlow.collect { state ->
-                updateStatus(connected = state != null)
-            }
+            ControllerService.stateFlow.collect { updateStatus() }
+        }
+
+        // Honest link status: recomputed by the service from actual frame liveness, so the card
+        // stops claiming health while the controller is silent.
+        lifecycleScope.launch {
+            ControllerService.linkStatusFlow.collect { updateStatus() }
         }
 
         // Handle intent if launched by USB attach event
@@ -805,7 +816,7 @@ class MainActivity : AppCompatActivity() {
         startService(intent)
         serviceRunning = false
         hasSeenActiveMode = false
-        updateStatus(connected = false)
+        updateStatus()
         binding.btnToggleService.text = getString(R.string.btn_start)
         log("Service stopped")
     }
@@ -825,10 +836,30 @@ class MainActivity : AppCompatActivity() {
      * The pill flips to a green tint as soon as HID frames are actually flowing, which is
      * a much more honest signal than "the user pressed Start".
      */
-    private fun updateStatus(connected: Boolean) {
-        binding.tvControllerStatus.text =
-            if (connected) "Controller: Ready" else "Controller: disconnected"
 
+    /**
+     * The status card. Driven by [ControllerService.linkStatusFlow], not by "is the service
+     * running" — a green card with a silent controller is indistinguishable from a broken one, and
+     * that is exactly what the old version showed. Only LINKED gets the connected styling.
+     */
+    private fun updateStatus() {
+        val status = ControllerService.linkStatusFlow.value
+        binding.tvControllerStatus.text =
+            when (status.state) {
+                ControllerService.LinkState.LINKED -> getString(R.string.status_ready)
+
+                ControllerService.LinkState.STALE ->
+                    getString(R.string.status_link_lost, status.detail)
+
+                ControllerService.LinkState.DISCONNECTED ->
+                    if (status.detail.isEmpty()) {
+                        getString(R.string.status_disconnected)
+                    } else {
+                        getString(R.string.status_disconnected_reason, status.detail)
+                    }
+            }
+
+        val connected = status.state == ControllerService.LinkState.LINKED
         val containerColor =
             if (connected) {
                 ContextCompat.getColor(this, R.color.status_connected_container)
@@ -845,6 +876,27 @@ class MainActivity : AppCompatActivity() {
         // statusPillCard only exists in the phone layout; sw600dp/TV use a different layout.
         binding.statusPillCard?.setCardBackgroundColor(containerColor)
         binding.tvShizukuStatus.setTextColor(textColor)
+    }
+
+    /**
+     * Reconnect from the status card. Stop then start, which covers every failure mode: no
+     * controller paired, controller asleep, or a handshake that stalled and never recovered.
+     */
+    private fun restartService() {
+        log("Reconnecting…")
+        Toast.makeText(this, R.string.reconnecting, Toast.LENGTH_SHORT).show()
+        if (serviceRunning) {
+            startService(
+                Intent(this, ControllerService::class.java).apply {
+                    action = ControllerService.ACTION_STOP
+                }
+            )
+            serviceRunning = false
+        }
+        lifecycleScope.launch {
+            delay(SERVICE_RESTART_DELAY_MS)
+            checkPermissionsAndStart()
+        }
     }
 
     private fun log(msg: String) {

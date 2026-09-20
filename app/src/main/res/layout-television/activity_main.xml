@@ -89,6 +89,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+            android:clickable="true"
+            android:focusable="true"
             app:cardBackgroundColor="@color/status_idle_container"
             app:cardCornerRadius="14dp"
             app:cardElevation="0dp">
