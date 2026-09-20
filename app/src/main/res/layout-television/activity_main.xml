@@ -382,7 +382,7 @@
             android:layout_height="56dp"
             android:layout_marginTop="14dp"
             android:nextFocusDown="@id/btnCalibration"
-            android:nextFocusUp="@id/dropdownBtDevice"
+            android:nextFocusUp="@id/btnRefreshBt"
             android:text="@string/btn_start"
             android:textSize="16sp"
             android:textStyle="bold"
