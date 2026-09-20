@@ -357,6 +357,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="none"
+                    android:nextFocusDown="@id/btnToggleService"
                     android:textColor="?attr/colorOnSurface"
                     android:textSize="13sp"
                     tools:ignore="LabelFor" />
@@ -369,6 +370,7 @@
                 android:layout_height="48dp"
                 android:layout_marginStart="10dp"
                 android:contentDescription="@string/main_refresh_bt_desc"
+                android:nextFocusDown="@id/btnToggleService"
                 app:icon="@drawable/ic_refresh"
                 app:iconSize="20dp" />
         </LinearLayout>
@@ -379,6 +381,8 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="14dp"
+            android:nextFocusDown="@id/btnCalibration"
+            android:nextFocusUp="@id/dropdownBtDevice"
             android:text="@string/btn_start"
             android:textSize="16sp"
             android:textStyle="bold"

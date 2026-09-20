@@ -276,6 +276,16 @@ class MainActivity : AppCompatActivity() {
                 Transport.BLUETOOTH -> R.id.btnTransportBt
             }
         binding.toggleTransport.check(initialButtonId)
+
+        // On TV the end icon inside the dropdown field is its own focus stop, and DOWN from it
+        // jumped straight past the "Start Service" button to the bottom card row (the field's
+        // nextFocusDown never applied, because focus was on the icon rather than the field).
+        // The field itself still opens the picker, so take the icon out of the focus order.
+        // Reached by id because TextInputLayout's endIconView is package-private.
+        binding.tilBtDevice
+            .findViewById<View?>(com.google.android.material.R.id.text_input_end_icon)
+            ?.isFocusable = false
+
         updateBtPickerVisibility(current)
 
         binding.toggleTransport.addOnButtonCheckedListener { _, checkedId, isChecked ->
