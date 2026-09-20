@@ -9,6 +9,7 @@ import com.steamcontroller.android.Prefs
 import com.steamcontroller.android.input.DEFAULT_MOUSE_MAPPING
 import com.steamcontroller.android.input.MOUSE_LEFT_PAD_CLICK_BIT
 import com.steamcontroller.android.input.MOUSE_MODE_FIXED_DPAD
+import com.steamcontroller.android.input.MOUSE_RIGHT_PAD_CLICK_BIT
 import com.steamcontroller.android.input.MouseTarget
 import com.steamcontroller.android.input.SteamButton
 import com.steamcontroller.android.input.StickCalibration
@@ -435,8 +436,15 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
             }
 
         var keys = mappedKeys
-        // Left trackpad click → left mouse click (only active when sidecar mouse is on).
-        if (cachedTrackpadAsMouse && state.isButtonPressed(MOUSE_LEFT_PAD_CLICK_BIT)) {
+        // Either trackpad click → left mouse click (only active when the sidecar mouse is on).
+        // The right pad is the one driving the cursor, so its click is the primary one, and the
+        // left pad click matches it so "click the pad" behaves the same on both.
+        if (cachedTrackpadAsMouse &&
+            (
+                state.isButtonPressed(MOUSE_LEFT_PAD_CLICK_BIT) ||
+                    state.isButtonPressed(MOUSE_RIGHT_PAD_CLICK_BIT)
+                )
+        ) {
             keys = keys or (1 shl MouseTarget.BTN_LEFT.bit)
         }
 
