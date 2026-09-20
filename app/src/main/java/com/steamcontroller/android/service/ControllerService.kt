@@ -2,7 +2,6 @@ package com.steamcontroller.android.service
 
 import android.app.*
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.hardware.usb.UsbDevice
@@ -10,6 +9,7 @@ import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import com.steamcontroller.android.BuildConfig
 import com.steamcontroller.android.Prefs
 import com.steamcontroller.android.R
 import com.steamcontroller.android.Transport
@@ -606,7 +606,9 @@ class ControllerService : Service() {
         // mask is unchanged across left-pad clicks), so dump the whole state report whenever the
         // mask changes. Diffing these against a click identifies the byte that carries it.
         val nowMs = android.os.SystemClock.uptimeMillis()
-        if (state.buttons != lastRawLogButtons || nowMs - lastRawLogMs > 5000L) {
+        if (BuildConfig.DEBUG &&
+            (state.buttons != lastRawLogButtons || nowMs - lastRawLogMs > 5000L)
+        ) {
             lastRawLogButtons = state.buttons
             lastRawLogMs = nowMs
             Log.i(

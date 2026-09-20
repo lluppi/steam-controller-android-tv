@@ -629,3 +629,15 @@ Still open: **P0.S1** (choose the fork's GitHub repo name and wire `origin`), **
 switching and lifecycle parity — needs a controller), the left trackpad click (`HANDOVER.md` §5),
 the `Buttons` constant audit, the Shizuku user-service leak, the ktlint churn cleanup before any
 upstream PR, and **P6** (rumble).
+
+### Cleanup pass
+
+- **Shizuku user-service leak fixed and verified**: the service reaps itself after 60s without a
+  client call, so a SIGKILLed app no longer leaves an orphan holding dead duplicate uhid devices.
+- **Stuck-binding bug fixed**: `onServiceDisconnected` now clears `bound`, so the app can re-bind
+  after its user service dies (previously it could never create devices again without a restart).
+- Deduped the two mouse-frame send paths into one helper; gated all three diagnostics behind
+  `BuildConfig.DEBUG`; removed a dead import.
+- **Left for a verified session**: the phone and sw600dp layouts lack the focus-order fixes the TV
+  layout got (ids and attributes needed are listed in `HANDOVER.md`), and merging those three
+  near-identical layouts is a refactor of its own.

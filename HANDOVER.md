@@ -332,3 +332,35 @@ Start here, in this order:
 - The state report is **46 bytes** on current firmware with the button field in bytes 2-5 (all zero
   when idle) — but note the caveat in §6: the length has differed between sessions, so pin offsets
   to the report id before drawing conclusions from byte positions.
+
+### Cleanup pass (same session)
+
+- **The Shizuku user service is now reaped by a watchdog.** A clean stop always reaped it
+  (verified: 0 processes after `stop-service`); the leak was specific to a SIGKILLed app, which
+  leaves the service orphaned with its uhid devices still registered — that is how duplicate
+  gamepads accumulate. `UInputService` now exits after 60s with no client call (the app polls at
+  50 Hz while alive). Verified by force-stopping the app and watching the process disappear, then
+  re-starting and watching it re-bind.
+- **`onServiceDisconnected` must clear `bound`.** Leaving it `true` made `bind()`'s
+  `if (bound) return` short-circuit forever: once a user service died under the app, the app could
+  never create devices again without a full restart. `onBindingDied`/`onNullBinding` are handled
+  the same way now.
+- The two mouse modes (sidecar and desktop) had the same no-op guard, send and error handling
+  copy-pasted; they share one helper now, which is also where the guard's rationale lives.
+- The three diagnostics added during this work (sidecar probe, transmitted key mask, raw state
+  report) are gated behind `BuildConfig.DEBUG`, so release builds stay quiet and the tools remain
+  for debug builds.
+- Removed a dead `android.bluetooth.BluetoothManager` import.
+
+**Deliberately not done:**
+
+- **The three `activity_main` layouts are near-duplicates** (`layout/`, `layout-sw600dp/`,
+  `layout-television/`, ~640 lines each) and only the TV one carries the focus-order fixes. The
+  other two need the same `nextFocusDown`/`nextFocusUp` additions (device field + refresh button →
+  `btnToggleService`; `btnToggleService` → first card; each card → `btnToggleService`; plus
+  `clickable`/`focusable` on `statusPillCard`). Left alone because it cannot be verified here and
+  a bad edit would break a layout with no way to look at it. Merging the three into one layout is
+  the real fix, and is a refactor of its own.
+- **The service exposes five state flows** (`modeFlow`, `linkStatusFlow`, `batteryFlow`,
+  `backendIdFlow`, `backendDetailFlow`). They could collapse into one `ServiceState`; each is
+  meaningful and separately consumed today, so it was not worth the churn and UI risk in this pass.

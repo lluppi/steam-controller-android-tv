@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.util.Log
+import com.steamcontroller.android.BuildConfig
 import com.steamcontroller.android.Prefs
 import com.steamcontroller.android.input.DEFAULT_MOUSE_MAPPING
 import com.steamcontroller.android.input.MOUSE_LEFT_PAD_CLICK_BIT
@@ -468,7 +469,9 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         }
 
         val nowMs = android.os.SystemClock.uptimeMillis()
-        if (state.buttons != lastSidecarButtons || nowMs - lastSidecarLogMs > 5000L) {
+        if (BuildConfig.DEBUG &&
+            (state.buttons != lastSidecarButtons || nowMs - lastSidecarLogMs > 5000L)
+        ) {
             lastSidecarLogMs = nowMs
             lastSidecarButtons = state.buttons
             Log.i(
@@ -481,24 +484,39 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
                     "buttons=0x${state.buttons.toString(16)}'"
             )
         }
+        sendMouseFrameIfChanged(svc, relX, relY, scrollTicks, keys, state.buttons)
+    }
+
+    /**
+     * Hand a sidecar/desktop mouse+keyboard frame to the service, unless nothing about it changed.
+     *
+     * The guard is not just tidiness: a mouse node that reports every frame keeps the cursor
+     * "active", and Android then routes DPAD events to it instead of the focused IME (see the
+     * native sendMouseFrame). It compares against the last *sent* state rather than against zero,
+     * so the frame that releases a key is never the one that gets skipped.
+     *
+     * Shared by both mouse modes — they differ only in how `keys` was built.
+     */
+    private fun sendMouseFrameIfChanged(
+        svc: IUInputService,
+        relX: Int,
+        relY: Int,
+        scrollTicks: Int,
+        keys: Int,
+        mask: Int
+    ) {
         if (relX == 0 && relY == 0 && scrollTicks == 0 && keys == lastSentKeys) return
         lastSentKeys = keys
-        // Diagnostic: log exactly what is transmitted, so "the left pad emits a click" stops being
-        // an inference from the button mask. If this prints on a left-pad click then the app did
-        // its part and the failure is downstream; if it stays silent, the click bit never arrived.
-        if (keys != 0) {
-            Log.i(
-                TAG,
-                "sidecar CLICK: keys=0x${keys.toString(16)} " +
-                    "leftPadBit=${state.isButtonPressed(MOUSE_LEFT_PAD_CLICK_BIT)} " +
-                    "rightPadBit=${state.isButtonPressed(MOUSE_RIGHT_PAD_CLICK_BIT)} " +
-                    "mask=0x${state.buttons.toString(16)}"
-            )
+        if (BuildConfig.DEBUG && keys != 0) {
+            // The exact key mask handed to the native layer. "The left pad emits a click" was
+            // twice inferred from the button mask and twice wrong — this is the authoritative
+            // record of what was actually transmitted.
+            Log.i(TAG, "mouse frame: keys=0x${keys.toString(16)} mask=0x${mask.toString(16)}")
         }
         try {
             svc.sendMouseFrame(relX, relY, scrollTicks, keys)
         } catch (t: Throwable) {
-            Log.e(TAG, "sendMouseFrame (sidecar) IPC failed: ${t.message}")
+            Log.e(TAG, "sendMouseFrame IPC failed: ${t.message}")
         }
     }
 
@@ -599,13 +617,6 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         // Same "nothing changed → don't send" rule as the gamepad-mode sidecar: a frame
         // that keeps the mouse node reporting makes Android hold the cursor active and
         // route DPAD to it instead of the focused IME.
-        if (relX == 0 && relY == 0 && scrollTicks == 0 && keys == lastSentKeys) return
-        lastSentKeys = keys
-
-        try {
-            svc.sendMouseFrame(relX, relY, scrollTicks, keys)
-        } catch (t: Throwable) {
-            Log.e(TAG, "sendMouseFrame IPC failed: ${t.message}")
-        }
+        sendMouseFrameIfChanged(svc, relX, relY, scrollTicks, keys, state.buttons)
     }
 }
