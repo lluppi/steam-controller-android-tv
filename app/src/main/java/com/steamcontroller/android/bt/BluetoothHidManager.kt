@@ -78,6 +78,10 @@ class BluetoothHidManager(private val context: Context) {
     private val reconnectRunnable = Runnable { attemptReconnect("backoff") }
     private var aclReceiver: BroadcastReceiver? = null
 
+    // Set when a handshake stalls, so the next connect clears the stack's cached GATT database
+    // before re-discovering (see refreshGattCache).
+    private var refreshNextConnect = false
+
     val isBluetoothAvailable: Boolean get() = adapter != null && adapter.isEnabled
 
     fun listPairedSteamControllers(): List<BluetoothDevice> {
@@ -204,8 +208,28 @@ class BluetoothHidManager(private val context: Context) {
             reconnectAttempts++
             state = State.IDLE
             closeGatt()
+            // A stalled step usually means the stack's cached handle layout is stale; drop it
+            // on the way back in rather than retrying the same dead handles forever.
+            refreshNextConnect = true
             scheduleReconnect("handshake timeout")
         }
+
+    /**
+     * Clear this device's cached GATT database in the Bluetooth stack.
+     *
+     * The stack caches services/characteristics per bonded device. When that cache no longer
+     * matches the peripheral's handle layout, a descriptor write is sent to a stale handle and
+     * no callback ever arrives — the device then looks permanently broken (bonded, connects,
+     * then silence) and only an unpair/re-pair, which also drops the cache, appears to fix it.
+     * `refresh()` is hidden API, so it is called reflectively; if it is unavailable the retry
+     * loop still applies, so a failure here is harmless.
+     */
+    private fun refreshGattCache(g: BluetoothGatt): Boolean = try {
+        (g.javaClass.getMethod("refresh").invoke(g) as? Boolean) ?: false
+    } catch (t: Throwable) {
+        Log.w(TAG, "gatt.refresh() unavailable: ${t.message}")
+        false
+    }
 
     private fun armWatchdog(step: String) {
         handler.removeCallbacks(handshakeWatchdog)
@@ -366,6 +390,11 @@ class BluetoothHidManager(private val context: Context) {
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     onConnectionChange?.invoke(true)
+                    if (refreshNextConnect) {
+                        refreshNextConnect = false
+                        Log.i(TAG, "Refreshing cached GATT database before re-discovering")
+                        refreshGattCache(g)
+                    }
                     // Request a tight connection interval (11.25–15ms) to minimize input latency.
                     // Default is ~50ms which is fine for sensors but laggy for gamepads.
                     val priOk = g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
