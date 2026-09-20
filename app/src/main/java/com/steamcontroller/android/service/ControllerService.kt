@@ -100,6 +100,10 @@ class ControllerService : Service() {
     // subscription, which presents as "the controller went unresponsive".
     private var initializing = false
     private var initializedTransport: Transport? = null
+
+    // Diagnostic for the trackpad clicks (see onHidFrame).
+    private var lastRawLogButtons = 0
+    private var lastRawLogMs = 0L
     private var reader: HidReportReader? = null
     private var heartbeatJob: Job? = null
 
@@ -476,6 +480,20 @@ class ControllerService : Service() {
     private fun onHidFrame(state: SteamControllerState, raw: ByteArray) {
         _stateFlow.value = state
         _rawReportFlow.value = raw
+
+        // Diagnostic: the left trackpad click does not show up in the button field at all (the
+        // mask is unchanged across left-pad clicks), so dump the whole state report whenever the
+        // mask changes. Diffing these against a click identifies the byte that carries it.
+        val nowMs = android.os.SystemClock.uptimeMillis()
+        if (state.buttons != lastRawLogButtons || nowMs - lastRawLogMs > 5000L) {
+            lastRawLogButtons = state.buttons
+            lastRawLogMs = nowMs
+            Log.i(
+                TAG,
+                "raw[${raw.size}] mask=0x${state.buttons.toString(16)} " +
+                    raw.joinToString(" ") { "%02x".format(it) }
+            )
+        }
 
         // Dedicated battery/charge report (id 0x43) — works on both USB and BT,
         // percent is already 0-100. Sole battery source: bytes 44-45 of the 0x45 state
