@@ -3,14 +3,15 @@ package com.steamcontroller.android.uinput
 import android.content.Context
 import android.util.Log
 
-// Bound by Shizuku.bindUserService() — this code runs in a separate process
-// with shell UID (2000), which on most Android versions can open /dev/uinput.
+// Bound by Shizuku.bindUserService() — this code runs in a separate process with the
+// shell UID (2000), which is what gives access to the virtual-output device nodes.
 //
 // IMPORTANT: must have a no-arg constructor. Shizuku v13+ also tries the Context
 // constructor first; either is acceptable.
 class UInputService : IUInputService.Stub {
-
-    companion object { private const val TAG = "UInputService" }
+    companion object {
+        private const val TAG = "UInputService"
+    }
 
     @Suppress("unused")
     constructor() : super() {
@@ -22,45 +23,80 @@ class UInputService : IUInputService.Stub {
         Log.i(TAG, "UInputService instantiated (Context=$context)")
     }
 
-    override fun canCreateDevice(): Boolean {
-        return try {
-            UInputNative.canOpen()
+    override fun selectBackend(preferred: Int): Int =
+        try {
+            UInputNative.selectBackend(preferred)
         } catch (t: Throwable) {
-            Log.e(TAG, "canOpen failed: ${t.message}")
+            Log.e(TAG, "selectBackend failed: ${t.message}")
+            UInputNative.Backend.NONE
+        }
+
+    override fun getBackend(): Int =
+        try {
+            UInputNative.currentBackend()
+        } catch (t: Throwable) {
+            Log.e(TAG, "getBackend failed: ${t.message}")
+            UInputNative.Backend.NONE
+        }
+
+    override fun getBackendDetail(): String =
+        try {
+            UInputNative.backendDetail()
+        } catch (t: Throwable) {
+            Log.e(TAG, "getBackendDetail failed: ${t.message}")
+            "unavailable: ${t.message}"
+        }
+
+    override fun supportsRumble(): Boolean =
+        try {
+            UInputNative.supportsRumble()
+        } catch (t: Throwable) {
+            Log.e(TAG, "supportsRumble failed: ${t.message}")
             false
         }
-    }
 
-    override fun createGamepad(profileId: Int): Boolean {
-        return try {
+    override fun createGamepad(profileId: Int): Boolean =
+        try {
             UInputNative.createDevice(profileId)
         } catch (t: Throwable) {
             Log.e(TAG, "createDevice failed: ${t.message}")
             false
         }
-    }
 
     override fun sendFrame(
         buttons: Int,
-        leftStickX: Int, leftStickY: Int,
-        rightStickX: Int, rightStickY: Int,
-        leftTrigger: Int, rightTrigger: Int,
-        dpadX: Int, dpadY: Int
+        leftStickX: Int,
+        leftStickY: Int,
+        rightStickX: Int,
+        rightStickY: Int,
+        leftTrigger: Int,
+        rightTrigger: Int,
+        dpadX: Int,
+        dpadY: Int,
     ) {
         try {
             UInputNative.sendFrame(
                 buttons,
-                leftStickX, leftStickY,
-                rightStickX, rightStickY,
-                leftTrigger, rightTrigger,
-                dpadX, dpadY
+                leftStickX,
+                leftStickY,
+                rightStickX,
+                rightStickY,
+                leftTrigger,
+                rightTrigger,
+                dpadX,
+                dpadY,
             )
         } catch (t: Throwable) {
             Log.e(TAG, "sendFrame failed: ${t.message}")
         }
     }
 
-    override fun sendMouseFrame(relX: Int, relY: Int, scrollY: Int, keys: Int) {
+    override fun sendMouseFrame(
+        relX: Int,
+        relY: Int,
+        scrollY: Int,
+        keys: Int,
+    ) {
         try {
             UInputNative.sendMouseFrame(relX, relY, scrollY, keys)
         } catch (t: Throwable) {
@@ -68,21 +104,21 @@ class UInputService : IUInputService.Stub {
         }
     }
 
-    override fun pollForceFeedback(): IntArray? {
-        return try {
+    override fun pollForceFeedback(): IntArray? =
+        try {
             UInputNative.pollFFEvent()
         } catch (t: Throwable) {
             Log.e(TAG, "pollFFEvent failed: ${t.message}")
             null
         }
-    }
 
     override fun runShellCommand(cmd: Array<String>?): Int {
         if (cmd.isNullOrEmpty()) return -1
         return try {
-            val proc = ProcessBuilder(cmd.toList())
-                .redirectErrorStream(true)
-                .start()
+            val proc =
+                ProcessBuilder(cmd.toList())
+                    .redirectErrorStream(true)
+                    .start()
             val exit = proc.waitFor()
             Log.i(TAG, "runShellCommand ${cmd.joinToString(" ")} → exit=$exit")
             exit
@@ -95,9 +131,10 @@ class UInputService : IUInputService.Stub {
     override fun runShellCommandForOutput(cmd: Array<String>?): String? {
         if (cmd.isNullOrEmpty()) return null
         return try {
-            val proc = ProcessBuilder(cmd.toList())
-                .redirectErrorStream(true)
-                .start()
+            val proc =
+                ProcessBuilder(cmd.toList())
+                    .redirectErrorStream(true)
+                    .start()
             val output = proc.inputStream.bufferedReader().readText()
             proc.waitFor()
             output.trim()
@@ -108,7 +145,9 @@ class UInputService : IUInputService.Stub {
     }
 
     override fun destroy() {
-        try { UInputNative.destroy() } catch (t: Throwable) {
+        try {
+            UInputNative.destroy()
+        } catch (t: Throwable) {
             Log.e(TAG, "destroy native failed: ${t.message}")
         }
         // Shizuku contract: destroy() must terminate the process

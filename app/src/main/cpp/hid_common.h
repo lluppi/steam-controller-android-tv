@@ -1,0 +1,170 @@
+// Shared vocabulary for the virtual-output backends.
+//
+// Two backends exist (see output_backend.h):
+//   * uinput — /dev/uinput. Upstream's implementation: one evdev device per virtual
+//              device, needs the shell UID to be allowed to open /dev/uinput.
+//   * uhid   — /dev/uhid. Presents a real HID device; the kernel binds hid-generic
+//              and produces a genuine InputDevice. Used where /dev/uinput is closed
+//              to the shell UID (e.g. NVIDIA Shield TV, where /dev/uinput belongs to
+//              system:bluetooth and /dev/uhid is open to the shell).
+//
+// Every value the Kotlin side sends is expressed in the ranges and bit orders below,
+// so each backend translates from one shared contract instead of defining its own.
+//
+// Define LOG_TAG before including this header to change the logcat tag.
+#pragma once
+
+#include <android/log.h>
+#include <linux/input.h>
+#include <stdint.h>
+#include <time.h>
+
+#ifndef LOG_TAG
+#define LOG_TAG "virtual_input"
+#endif
+#ifndef LOGI
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#endif
+#ifndef LOGE
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#endif
+
+// ── Emulated controller identities ──────────────────────────────────────────
+// `id` MUST match GamepadProfile.kt. VID/PID are what Android matches its
+// Vendor_xxxx_Product_yyyy.kl keylayouts on, so they are part of the contract too.
+struct gamepad_profile {
+    int id;
+    uint16_t vid;
+    uint16_t pid;
+    const char* name;
+    bool mouse_mode;  // true = Desktop profile: mouse + keyboard, no gamepad
+};
+
+inline const gamepad_profile PROFILES[] = {
+    { 0, 0x045E, 0x028E, "Microsoft X-Box 360 pad",                                    false },
+    { 1, 0x045E, 0x02EA, "Microsoft Xbox One Controller",                              false },
+    { 2, 0x054C, 0x05C4, "Sony Interactive Entertainment Wireless Controller",          false },
+    { 3, 0x054C, 0x0CE6, "Sony Interactive Entertainment DualSense Wireless Controller", false },
+    { 4, 0x046D, 0xC077, "Steam Controller Desktop",                                   true  },
+};
+
+inline const gamepad_profile& find_profile(int id) {
+    for (const auto& p : PROFILES) {
+        if (p.id == id) return p;
+    }
+    return PROFILES[0];  // fallback: Xbox 360
+}
+
+// Both backends destroy and recreate devices on every profile switch. Give the
+// kernel and Android's InputReader a moment to release the old input device records:
+// without it, rapid switching can hit transient failures where device creation
+// reports success but Android never sees the new device, leaving the UI convinced
+// everything is healthy while no events flow.
+inline void wait_for_input_records_to_settle() {
+    const struct timespec ts = { 0, 80 * 1000 * 1000 };  // 80ms
+    nanosleep(&ts, nullptr);
+}
+
+// ── Frame ranges ────────────────────────────────────────────────────────────
+// The Xbox 360 layout is the common denominator: a frame is always expressed in
+// these ranges regardless of which profile name the backend advertises.
+constexpr int STICK_MIN = -32768;
+constexpr int STICK_MAX = 32767;
+constexpr int TRIG_MIN = 0;
+constexpr int TRIG_MAX = 255;
+constexpr int HAT_MIN = -1;
+constexpr int HAT_MAX = 1;
+
+// ── Gamepad buttons ─────────────────────────────────────────────────────────
+// Bit positions MUST match XboxButtons in XboxDescriptor.kt.
+enum XboxBit {
+    XB_A = 0, XB_B, XB_X, XB_Y, XB_LB, XB_RB,
+    XB_SELECT, XB_START, XB_MODE, XB_THUMBL, XB_THUMBR,
+    XB_COUNT,
+};
+
+// Both encodings of each button, in XboxBit order — the single source of truth for
+// "which bit is which button".
+//
+//   evdev     evdev code for the uinput backend. (Not named `linux`: that is a
+//             preprocessor macro in the Linux input header chain.)
+//   hid_index HID Button usage number for the uhid backend. Linux maps gamepad
+//             button N to BTN_GAMEPAD + N - 1, so index 3 lands on BTN_C, 6 on
+//             BTN_Z, 9 on BTN_TL2 and 10 on BTN_TR2. Those are skipped: the HID
+//             descriptor declares 15 buttons so the indexes line up with the
+//             BTN_* codes Android's gamepad keylayouts actually use.
+struct xbox_button {
+    int evdev;
+    uint8_t hid_index;
+};
+
+inline constexpr xbox_button XBOX_BUTTONS[XB_COUNT] = {
+    { BTN_A,       1  },  // XB_A
+    { BTN_B,       2  },  // XB_B
+    { BTN_X,       4  },  // XB_X
+    { BTN_Y,       5  },  // XB_Y
+    { BTN_TL,      7  },  // XB_LB
+    { BTN_TR,      8  },  // XB_RB
+    { BTN_SELECT, 11  },  // XB_SELECT
+    { BTN_START,  12  },  // XB_START
+    { BTN_MODE,   13  },  // XB_MODE
+    { BTN_THUMBL, 14  },  // XB_THUMBL
+    { BTN_THUMBR, 15  },  // XB_THUMBR
+};
+
+// ── Sidecar keys ────────────────────────────────────────────────────────────
+// Used by Desktop mode and by back-paddle key mappings in gamepad mode.
+// Bit positions MUST match MouseTarget.kt `bit` values: 0..15 are keys, 16..18 are
+// mouse buttons (see MK_BTN_*_BIT below).
+enum MouseKeyBit {
+    MK_UP = 0, MK_DOWN, MK_LEFT, MK_RIGHT,
+    MK_ENTER, MK_BACK, MK_TAB, MK_SPACE,
+    MK_HOME, MK_ESC, MK_VOLUME_UP, MK_VOLUME_DOWN,
+    MK_PLAY_PAUSE, MK_MENU, MK_BACKSPACE, MK_DPAD_CENTER,
+    MK_COUNT,
+};
+
+// Consumer-page (0x0C) bits, in HID descriptor declaration order: the index IS the
+// report bit. hid_descriptors.h must declare them in this exact order.
+enum ConsumerBit {
+    CB_PLAY_PAUSE = 0, CB_MENU, CB_SELECT, CB_VOLUME_UP, CB_VOLUME_DOWN, CB_BACK, CB_HOME,
+    CB_COUNT,
+};
+
+// One entry per key bit, carrying both encodings:
+//   evdev    evdev code for the uinput keyboard device.
+//   consumer false: Keyboard page (0x07), `code` is the HID usage. The uhid keyboard
+//                     reports these through its key-array field.
+//            true:  Consumer page (0x0C), `code` is a ConsumerBit index. The uhid
+//                     keyboard reports these as individual bits in report id 2.
+//
+// The trailing comments are the evdev code the uhid path is expected to produce on
+// the Android side; they are what the on-device parity check compares against.
+inline constexpr uint8_t MK_BTN_LEFT_BIT   = 16;
+inline constexpr uint8_t MK_BTN_RIGHT_BIT  = 17;
+inline constexpr uint8_t MK_BTN_MIDDLE_BIT = 18;
+
+struct sidecar_key {
+    int evdev;
+    bool consumer;
+    uint8_t code;
+};
+
+inline constexpr sidecar_key SIDECAR_KEYS[MK_COUNT] = {
+    /* MK_UP          */ { KEY_UP,         false, 0x52 },        // → KEY_UP
+    /* MK_DOWN        */ { KEY_DOWN,       false, 0x51 },        // → KEY_DOWN
+    /* MK_LEFT        */ { KEY_LEFT,       false, 0x50 },        // → KEY_LEFT
+    /* MK_RIGHT       */ { KEY_RIGHT,      false, 0x4F },        // → KEY_RIGHT
+    /* MK_ENTER       */ { KEY_ENTER,      false, 0x28 },        // → KEY_ENTER
+    /* MK_BACK        */ { KEY_BACK,       true,  CB_BACK },     // AC Back    → KEY_BACK
+    /* MK_TAB         */ { KEY_TAB,        false, 0x2B },        // → KEY_TAB
+    /* MK_SPACE       */ { KEY_SPACE,      false, 0x2C },        // → KEY_SPACE
+    /* MK_HOME        */ { KEY_HOME,       true,  CB_HOME },     // AC Home    → KEY_HOMEPAGE
+    /* MK_ESC         */ { KEY_ESC,        false, 0x29 },        // → KEY_ESC
+    /* MK_VOLUME_UP   */ { KEY_VOLUMEUP,   true,  CB_VOLUME_UP },   // Volume Inc → KEY_VOLUMEUP
+    /* MK_VOLUME_DOWN */ { KEY_VOLUMEDOWN, true,  CB_VOLUME_DOWN }, // Volume Dec → KEY_VOLUMEDOWN
+    /* MK_PLAY_PAUSE  */ { KEY_PLAYPAUSE,  true,  CB_PLAY_PAUSE },  // Play/Pause → KEY_PLAYPAUSE
+    /* MK_MENU        */ { KEY_MENU,       true,  CB_MENU },        // Menu       → KEY_MENU
+    /* MK_BACKSPACE   */ { KEY_BACKSPACE,  false, 0x2A },        // → KEY_BACKSPACE
+    /* MK_DPAD_CENTER */ { KEY_SELECT,     true,  CB_SELECT },   // Menu Pick  → KEY_SELECT
+};

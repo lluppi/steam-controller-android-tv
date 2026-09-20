@@ -1,9 +1,24 @@
 package com.steamcontroller.android.uinput;
 
+// Runs in the Shizuku user service process (shell UID).
+//
+// Fronts the virtual-output backends: /dev/uinput when the shell UID is allowed to open
+// it, /dev/uhid otherwise. See cpp/output_backend.h.
 interface IUInputService {
-    boolean canCreateDevice();
+    // Probe the backends and adopt one. `preferred` is 0 = auto, 1 = uinput, 2 = uhid.
+    // Returns the chosen backend id (0 = none usable, 1 = uinput, 2 = uhid).
+    int selectBackend(int preferred);
 
-    // Create a virtual gamepad with the given profile id (see GamepadProfile.kt).
+    int getBackend();
+
+    // Human-readable probe result for every backend, e.g.
+    // "/dev/uinput: Permission denied, /dev/uhid: ok". Shown in the UI.
+    String getBackendDetail();
+
+    // Whether games can receive rumble through the selected backend.
+    boolean supportsRumble();
+
+    // Create the virtual devices for the given profile id (see GamepadProfile.kt).
     // Returns true on success.
     boolean createGamepad(int profileId);
 

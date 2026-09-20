@@ -16,13 +16,16 @@ import com.steamcontroller.android.input.SystemActions
 import com.steamcontroller.android.input.XboxTarget
 import com.steamcontroller.android.parser.Buttons
 import com.steamcontroller.android.parser.SteamControllerState
-import kotlin.math.abs
 import rikka.shizuku.Shizuku
+import kotlin.math.abs
 
-// High-level Kotlin API for the virtual Xbox 360 gamepad.
-// Binds UInputService through Shizuku and translates SC2026 state into Xbox events.
-class UInputGamepad(private val context: Context, initialProfile: GamepadProfile) {
-
+// High-level Kotlin API for the virtual gamepad + mouse/keyboard sidecar.
+// Binds UInputService through Shizuku, translates SC2026 state into frames, and reports
+// which output backend the shell-UID process ended up using (uinput or uhid).
+class UInputGamepad(
+    private val context: Context,
+    initialProfile: GamepadProfile,
+) {
     private val TAG = "UInputGamepad"
 
     companion object {
@@ -31,30 +34,60 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         // writing the literal string "null".
         private const val SHOW_IME_UNSET_SENTINEL = "__unset__"
     }
+
     private var service: IUInputService? = null
     private var bound = false
+
     @Volatile private var profile: GamepadProfile = initialProfile
+
+    // Which backend the shell-UID process selected, and what it found while probing.
+    // Read after isReady; shown in the UI so a backend downgrade is never silent.
+    @Volatile var backendId: Int = UInputNative.Backend.NONE
+        private set
+
+    @Volatile var backendDetail: String = ""
+        private set
+
+    @Volatile var rumbleSupported: Boolean = false
+        private set
 
     /** Set by ControllerService to receive rumble commands from games. (strong, weak) ∈ [0, 65535]. */
     var onRumble: ((strong: Int, weak: Int) -> Unit)? = null
 
     private fun handleSpecialAction(target: XboxTarget) {
         when (target) {
-            XboxTarget.SCREENSHOT -> SystemActions.takeScreenshot(context) { cmd ->
-                try { service?.runShellCommand(cmd) ?: -1 } catch (_: Throwable) { -1 }
+            XboxTarget.SCREENSHOT -> {
+                SystemActions.takeScreenshot(context) { cmd ->
+                    try {
+                        service?.runShellCommand(cmd) ?: -1
+                    } catch (_: Throwable) {
+                        -1
+                    }
+                }
             }
+
             else -> {}
         }
     }
+
+    // Button state of the last sidecar/desktop frame sent. Tracked so an all-quiet frame
+    // can be dropped without dropping the frame that *releases* the last key — comparing
+    // against zero instead would leave a released key stuck down in the kernel.
+    private var lastSentKeys: Int = 0
+
     private var rumbleThread: Thread? = null
+
     @Volatile private var rumbleThreadRunning = false
 
     // Calibration + mapping cache — refreshed every refreshIntervalMs instead of every frame
     @Volatile private var cachedLeftCal: StickCalibration = StickCalibration.DEFAULT
+
     @Volatile private var cachedRightCal: StickCalibration = StickCalibration.DEFAULT
+
     @Volatile private var cachedMapping: Map<SteamButton, XboxTarget> = emptyMap()
+
     @Volatile private var lastCalRefresh: Long = 0
-    private val calRefreshIntervalMs = 250L  // ~4 Hz refresh, plenty for live tuning
+    private val calRefreshIntervalMs = 250L // ~4 Hz refresh, plenty for live tuning
 
     // Edge detection for special actions (screenshot etc.): we track the previous frame's
     // raw button bits so we can fire on 0 → 1 transitions only (not while held).
@@ -64,51 +97,68 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     private var lastRightPadX: Int = 0
     private var lastRightPadY: Int = 0
     private var rightPadHadContact: Boolean = false
+
     // Left trackpad → scroll wheel state (used in gamepad sidecar mode).
     private var lastLeftPadY: Int = 0
     private var leftPadHadContact: Boolean = false
+
     @Volatile private var cachedMouseSensitivity: Float = 1f
+
     @Volatile private var cachedTrackpadAsMouse: Boolean = true
+
     // Trigger / pad scroll: accumulator so we can convert continuous 0..32767 deltas into discrete wheel ticks
     private var scrollAccumulator: Int = 0
 
-    private val args = Shizuku.UserServiceArgs(
-        ComponentName(context.packageName, UInputService::class.java.name)
-    )
-        .daemon(false)
-        .processNameSuffix("uinput")
-        .debuggable(false)
-        .version(1)
+    private val args =
+        Shizuku
+            .UserServiceArgs(
+                ComponentName(context.packageName, UInputService::class.java.name),
+            ).daemon(false)
+            .processNameSuffix("uinput")
+            .debuggable(false)
+            // Bumped from 1: a stale user-service process would be running the previous AIDL
+            // (canCreateDevice) and silently fail every call below.
+            .version(2)
 
     @Volatile private var deviceReady = false
 
-    private val connection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            val svc = IUInputService.Stub.asInterface(binder)
-            service = svc
-            Log.i(TAG, "UInputService connected")
-            // Binder calls can block — do them off the main thread
-            Thread {
-                try {
-                    if (svc.canCreateDevice()) {
-                        val ok = svc.createGamepad(profile.id)
-                        deviceReady = ok
-                        Log.i(TAG, "createGamepad(${profile.displayName}) → $ok")
-                        if (ok) applyShowImeOverride(svc)
-                    } else {
-                        Log.e(TAG, "Cannot open /dev/uinput from shell UID — SELinux likely blocks it on this device")
+    private val connection =
+        object : ServiceConnection {
+            override fun onServiceConnected(
+                name: ComponentName?,
+                binder: IBinder?,
+            ) {
+                val svc = IUInputService.Stub.asInterface(binder)
+                service = svc
+                Log.i(TAG, "UInputService connected")
+                // Binder calls can block — do them off the main thread
+                Thread {
+                    try {
+                        val backend = svc.selectBackend(Prefs.getBackendPref(context))
+                        backendId = backend
+                        backendDetail = svc.getBackendDetail() ?: ""
+                        rumbleSupported = svc.supportsRumble()
+                        Log.i(TAG, "backend=${UInputNative.backendName(backend)} — $backendDetail")
+                        if (backend == UInputNative.Backend.NONE) {
+                            Log.e(TAG, "No usable input backend on this device")
+                        } else {
+                            val ok = svc.createGamepad(profile.id)
+                            deviceReady = ok
+                            Log.i(TAG, "createGamepad(${profile.displayName}) → $ok")
+                            if (ok) applyShowImeOverride(svc)
+                        }
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "init failed: ${t.message}")
                     }
-                } catch (t: Throwable) {
-                    Log.e(TAG, "init failed: ${t.message}")
-                }
-            }.start()
+                }.start()
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                service = null
+                deviceReady = false
+                Log.w(TAG, "UInputService disconnected")
+            }
         }
-        override fun onServiceDisconnected(name: ComponentName?) {
-            service = null
-            deviceReady = false
-            Log.w(TAG, "UInputService disconnected")
-        }
-    }
 
     fun bind() {
         if (bound) return
@@ -120,8 +170,14 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     fun unbind() {
         if (!bound) return
         stopRumbleThread()
-        try { service?.let { restoreShowImeOverride(it) } } catch (_: Throwable) {}
-        try { service?.destroy() } catch (_: Throwable) {}
+        try {
+            service?.let { restoreShowImeOverride(it) }
+        } catch (_: Throwable) {
+        }
+        try {
+            service?.destroy()
+        } catch (_: Throwable) {
+        }
         Shizuku.unbindUserService(args, connection, true)
         bound = false
         service = null
@@ -138,9 +194,12 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     private fun applyShowImeOverride(svc: IUInputService) {
         try {
             if (Prefs.getSavedShowImeHardKeyboard(context) == null) {
-                val current = try {
-                    svc.runShellCommandForOutput(arrayOf("settings", "get", "secure", "show_ime_with_hard_keyboard"))
-                } catch (_: Throwable) { null }
+                val current =
+                    try {
+                        svc.runShellCommandForOutput(arrayOf("settings", "get", "secure", "show_ime_with_hard_keyboard"))
+                    } catch (_: Throwable) {
+                        null
+                    }
                 val toSave = current?.takeIf { it.isNotBlank() && it != "null" } ?: SHOW_IME_UNSET_SENTINEL
                 Prefs.setSavedShowImeHardKeyboard(context, toSave)
             }
@@ -174,20 +233,30 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     private fun startRumbleThread() {
         if (rumbleThreadRunning) return
         rumbleThreadRunning = true
-        rumbleThread = Thread({
-            while (rumbleThreadRunning) {
-                try {
-                    val svc = service
-                    if (svc != null && deviceReady) {
-                        val rumble = svc.pollForceFeedback()
-                        if (rumble != null && rumble.size == 2) {
-                            onRumble?.invoke(rumble[0], rumble[1])
+        rumbleThread =
+            Thread({
+                while (rumbleThreadRunning) {
+                    try {
+                        val svc = service
+                        if (svc != null && deviceReady) {
+                            val rumble = svc.pollForceFeedback()
+                            if (rumble != null && rumble.size == 2) {
+                                onRumble?.invoke(rumble[0], rumble[1])
+                            }
                         }
+                    } catch (_: Throwable) {
+                        // IPC may fail during unbind, ignore
                     }
-                } catch (_: Throwable) { /* IPC may fail during unbind, ignore */ }
-                try { Thread.sleep(20) } catch (_: InterruptedException) { break }
+                    try {
+                        Thread.sleep(20)
+                    } catch (_: InterruptedException) {
+                        break
+                    }
+                }
+            }, "uinput-ff-poll").apply {
+                isDaemon = true
+                start()
             }
-        }, "uinput-ff-poll").apply { isDaemon = true; start() }
     }
 
     private fun stopRumbleThread() {
@@ -209,6 +278,9 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
             val ok = svc.createGamepad(newProfile.id)
             if (ok) {
                 profile = newProfile
+                // The backend recreates its devices on switch and forgets its own cached
+                // state; drop ours too so the next frame can't be mistaken for a no-op.
+                lastSentKeys = 0
                 Log.i(TAG, "Switched profile to ${newProfile.displayName}")
             } else {
                 Log.e(TAG, "createGamepad(${newProfile.displayName}) returned false")
@@ -227,11 +299,11 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         // Refresh cached calibrations + button mapping from prefs at most every 250ms
         val now = android.os.SystemClock.uptimeMillis()
         if (now - lastCalRefresh > calRefreshIntervalMs) {
-            cachedLeftCal  = Prefs.getLeftCalibration(context)
+            cachedLeftCal = Prefs.getLeftCalibration(context)
             cachedRightCal = Prefs.getRightCalibration(context)
-            cachedMapping  = Prefs.getAllMappings(context)
+            cachedMapping = Prefs.getAllMappings(context)
             cachedMouseSensitivity = Prefs.getMouseSensitivity(context)
-            cachedTrackpadAsMouse  = Prefs.getTrackpadAsMouseInGamepad(context)
+            cachedTrackpadAsMouse = Prefs.getTrackpadAsMouseInGamepad(context)
             lastCalRefresh = now
         }
 
@@ -240,7 +312,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
             return
         }
 
-        val leftCal  = cachedLeftCal
+        val leftCal = cachedLeftCal
         val rightCal = cachedRightCal
 
         // Apply the user-configurable button mapping.
@@ -258,11 +330,19 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
                 target.mask > 0 && pressed -> {
                     xboxButtons = xboxButtons or target.mask
                 }
+
                 target.keyBit >= 0 && pressed -> {
                     sidecarMappedKeys = sidecarMappedKeys or (1 shl target.keyBit)
                 }
-                target.triggerSide == 1 && pressed -> { ltOverride = 255 }
-                target.triggerSide == 2 && pressed -> { rtOverride = 255 }
+
+                target.triggerSide == 1 && pressed -> {
+                    ltOverride = 255
+                }
+
+                target.triggerSide == 2 && pressed -> {
+                    rtOverride = 255
+                }
+
                 target.mask < 0 && target.keyBit < 0 && target.triggerSide == 0 -> {
                     val wasPressed = (lastFrameButtons and source.mask) != 0
                     if (pressed && !wasPressed) handleSpecialAction(target)
@@ -274,22 +354,24 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         // SC2026 sticks are already in Int16 range — direct passthrough
         // SC2026 triggers are 0-32767 → scale down to Xbox 0-255.
         // ltOverride/rtOverride bump the axis to max when a remapped source is pressed.
-        val ltAnalog = (state.leftTrigger  * 255 / 32767).coerceIn(0, 255)
+        val ltAnalog = (state.leftTrigger * 255 / 32767).coerceIn(0, 255)
         val rtAnalog = (state.rightTrigger * 255 / 32767).coerceIn(0, 255)
         val lt = maxOf(ltAnalog, ltOverride)
         val rt = maxOf(rtAnalog, rtOverride)
 
-        val dpadX = when {
-            state.isButtonPressed(Buttons.DPAD_RIGHT) ->  1
-            state.isButtonPressed(Buttons.DPAD_LEFT)  -> -1
-            else -> 0
-        }
-        val dpadY = when {
-            state.isButtonPressed(Buttons.DPAD_DOWN) ->  1
-            state.isButtonPressed(Buttons.DPAD_UP)   -> -1
-            else -> 0
-        }
-        val (lxCal, lyCalRaw) = leftCal.apply(state.leftJoyX.toInt(),  state.leftJoyY.toInt())
+        val dpadX =
+            when {
+                state.isButtonPressed(Buttons.DPAD_RIGHT) -> 1
+                state.isButtonPressed(Buttons.DPAD_LEFT) -> -1
+                else -> 0
+            }
+        val dpadY =
+            when {
+                state.isButtonPressed(Buttons.DPAD_DOWN) -> 1
+                state.isButtonPressed(Buttons.DPAD_UP) -> -1
+                else -> 0
+            }
+        val (lxCal, lyCalRaw) = leftCal.apply(state.leftJoyX.toInt(), state.leftJoyY.toInt())
         val (rxCal, ryCalRaw) = rightCal.apply(state.rightJoyX.toInt(), state.rightJoyY.toInt())
 
         // SC2026 reports Y positive = up; Linux input ABS_Y convention is Y positive = down.
@@ -299,10 +381,14 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         try {
             svc.sendFrame(
                 xboxButtons,
-                lxCal, ly,
-                rxCal, ry,
-                lt, rt,
-                dpadX, dpadY
+                lxCal,
+                ly,
+                rxCal,
+                ry,
+                lt,
+                rt,
+                dpadX,
+                dpadY,
             )
         } catch (t: Throwable) {
             Log.e(TAG, "sendFrame IPC failed: ${t.message}")
@@ -321,25 +407,31 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
      * keeping the mouse fd idle is critical so Android IME focus isn't stolen by
      * a phantom cursor (same rationale as in Desktop mode).
      */
-    private fun pushSidecarFrame(svc: IUInputService, state: SteamControllerState, mappedKeys: Int) {
-        val (relX, relY, scrollTicks) = if (cachedTrackpadAsMouse) {
-            val (rx, ry) = computeRightPadDelta(state)
-            Triple(rx, ry, computeLeftPadScroll(state))
-        } else {
-            // Still reset accumulators / contact flags so a re-enable mid-session
-            // doesn't trigger a phantom delta on first touch.
-            rightPadHadContact = false
-            leftPadHadContact = false
-            scrollAccumulator = 0
-            Triple(0, 0, 0)
-        }
+    private fun pushSidecarFrame(
+        svc: IUInputService,
+        state: SteamControllerState,
+        mappedKeys: Int,
+    ) {
+        val (relX, relY, scrollTicks) =
+            if (cachedTrackpadAsMouse) {
+                val (rx, ry) = computeRightPadDelta(state)
+                Triple(rx, ry, computeLeftPadScroll(state))
+            } else {
+                // Still reset accumulators / contact flags so a re-enable mid-session
+                // doesn't trigger a phantom delta on first touch.
+                rightPadHadContact = false
+                leftPadHadContact = false
+                scrollAccumulator = 0
+                Triple(0, 0, 0)
+            }
 
         var keys = mappedKeys
         // Left trackpad click → left mouse click (only active when sidecar mouse is on).
         if (cachedTrackpadAsMouse && state.isButtonPressed(MOUSE_LEFT_PAD_CLICK_BIT)) {
             keys = keys or (1 shl MouseTarget.BTN_LEFT.bit)
         }
-        if (relX == 0 && relY == 0 && scrollTicks == 0 && keys == 0) return
+        if (relX == 0 && relY == 0 && scrollTicks == 0 && keys == lastSentKeys) return
+        lastSentKeys = keys
         try {
             svc.sendMouseFrame(relX, relY, scrollTicks, keys)
         } catch (t: Throwable) {
@@ -396,11 +488,14 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
      * face/system buttons → mapped keys, DPAD → arrow keys, left pad click → right mouse.
      * Special actions (e.g. SCREENSHOT) still fire via the gamepad mapping.
      */
-    private fun pushMouseFrame(svc: IUInputService, state: SteamControllerState) {
+    private fun pushMouseFrame(
+        svc: IUInputService,
+        state: SteamControllerState,
+    ) {
         // Right trackpad → cursor delta; left trackpad vertical → scroll wheel.
         // Same helpers as the gamepad sidecar mode so the gesture is identical.
-        val (relX, relY)   = computeRightPadDelta(state)
-        val scrollTicks    = computeLeftPadScroll(state)
+        val (relX, relY) = computeRightPadDelta(state)
+        val scrollTicks = computeLeftPadScroll(state)
 
         // ── Key/mouse-button bitmask ─────────────────────────────────────────
         var keys = 0
@@ -432,6 +527,12 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
             }
         }
         lastFrameButtons = state.buttons
+
+        // Same "nothing changed → don't send" rule as the gamepad-mode sidecar: a frame
+        // that keeps the mouse node reporting makes Android hold the cursor active and
+        // route DPAD to it instead of the focused IME.
+        if (relX == 0 && relY == 0 && scrollTicks == 0 && keys == lastSentKeys) return
+        lastSentKeys = keys
 
         try {
             svc.sendMouseFrame(relX, relY, scrollTicks, keys)

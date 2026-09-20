@@ -1,14 +1,14 @@
 package com.steamcontroller.android
 
+import android.Manifest
 import android.app.DownloadManager
 import android.app.PendingIntent
-import android.content.*
-import android.hardware.usb.UsbDevice
-import android.hardware.usb.UsbManager
-import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.content.*
 import android.content.pm.PackageManager
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -28,6 +28,7 @@ import com.steamcontroller.android.bt.BluetoothHidManager
 import com.steamcontroller.android.databinding.ActivityMainBinding
 import com.steamcontroller.android.service.ControllerService
 import com.steamcontroller.android.uinput.GamepadProfile
+import com.steamcontroller.android.uinput.UInputNative
 import com.steamcontroller.android.update.UpdateChecker
 import com.steamcontroller.android.update.UpdateInstaller
 import com.steamcontroller.android.usb.UsbConnectionManager
@@ -37,11 +38,11 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
-
     private val TAG = "MainActivity"
     private lateinit var binding: ActivityMainBinding
     private var serviceRunning = false
     private var pairedBtDevices: List<BluetoothDevice> = emptyList()
+
     // Tracks whether the current "started" session has reached a working injection mode.
     // Used so the modeFlow observer doesn't mistake StateFlow's initial NONE replay for
     // an external service stop right after the user pressed Start.
@@ -53,55 +54,66 @@ class MainActivity : AppCompatActivity() {
     private var pendingUpdateDownloadId: Long = -1L
     private var pendingUpdateApkFile: File? = null
 
-    private val usbReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
-                usbPermissionAction -> {
-                    val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-                    if (granted) {
-                        val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-                        device?.let { startControllerService(it) }
-                    } else {
-                        log("USB permission denied")
-                        Toast.makeText(this@MainActivity, "USB permission denied", Toast.LENGTH_SHORT).show()
+    private val usbReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context,
+                intent: Intent,
+            ) {
+                when (intent.action) {
+                    usbPermissionAction -> {
+                        val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                        if (granted) {
+                            val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+                            device?.let { startControllerService(it) }
+                        } else {
+                            log("USB permission denied")
+                            Toast.makeText(this@MainActivity, "USB permission denied", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                }
-                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
-                    val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-                    device?.let { onDeviceAttached(it) }
-                }
-                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-                    stopControllerService()
-                    updateStatus(connected = false)
-                    log("Controller disconnected")
+
+                    UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                        val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+                        device?.let { onDeviceAttached(it) }
+                    }
+
+                    UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                        stopControllerService()
+                        updateStatus(connected = false)
+                        log("Controller disconnected")
+                    }
                 }
             }
         }
-    }
 
-    private val downloadReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
-            if (id == -1L || id != pendingUpdateDownloadId) return
-            val apkFile = pendingUpdateApkFile ?: return
-            pendingUpdateDownloadId = -1L
-            pendingUpdateApkFile = null
-            UpdateInstaller.install(this@MainActivity, apkFile)
+    private val downloadReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context,
+                intent: Intent,
+            ) {
+                val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+                if (id == -1L || id != pendingUpdateDownloadId) return
+                val apkFile = pendingUpdateApkFile ?: return
+                pendingUpdateDownloadId = -1L
+                pendingUpdateApkFile = null
+                UpdateInstaller.install(this@MainActivity, apkFile)
+            }
         }
-    }
 
     private val shizukuRequestCode = 1001
 
-    private val shizukuPermissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
-        if (grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            log("Shizuku permission granted")
-            updateShizukuStatus(true)
-            checkAndRequestUsb()
-        } else {
-            log("Shizuku permission denied")
-            Toast.makeText(this, getString(R.string.shizuku_permission_denied), Toast.LENGTH_LONG).show()
+    private val shizukuPermissionListener =
+        Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+            if (grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                log("Shizuku permission granted")
+                updateShizukuStatus(true)
+                checkAndRequestUsb()
+            } else {
+                log("Shizuku permission denied")
+                Toast.makeText(this, getString(R.string.shizuku_permission_denied), Toast.LENGTH_LONG).show()
+            }
         }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -112,14 +124,17 @@ class MainActivity : AppCompatActivity() {
 
         Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
 
-        val filter = IntentFilter().apply {
-            addAction(usbPermissionAction)
-            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
-            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
-        }
+        val filter =
+            IntentFilter().apply {
+                addAction(usbPermissionAction)
+                addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+                addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+            }
         ContextCompat.registerReceiver(this, usbReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         ContextCompat.registerReceiver(
-            this, downloadReceiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            this,
+            downloadReceiver,
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
 
@@ -200,7 +215,9 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             ControllerService.profileFlow.collect { profileId ->
                 if (profileId == null) return@collect
-                val profile = com.steamcontroller.android.uinput.GamepadProfile.fromId(profileId)
+                val profile =
+                    com.steamcontroller.android.uinput.GamepadProfile
+                        .fromId(profileId)
                 syncControlModeToggle(profile)
                 refreshModeLabel()
             }
@@ -241,27 +258,29 @@ class MainActivity : AppCompatActivity() {
     private fun setupTransportDropdown() {
         // Reflect the saved transport in the toggle group
         val current = Prefs.getTransport(this)
-        val initialButtonId = when (current) {
-            Transport.USB       -> R.id.btnTransportUsb
-            Transport.BLUETOOTH -> R.id.btnTransportBt
-        }
+        val initialButtonId =
+            when (current) {
+                Transport.USB -> R.id.btnTransportUsb
+                Transport.BLUETOOTH -> R.id.btnTransportBt
+            }
         binding.toggleTransport.check(initialButtonId)
         updateBtPickerVisibility(current)
 
         binding.toggleTransport.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener  // only react when something is selected
-            val picked = when (checkedId) {
-                R.id.btnTransportUsb -> Transport.USB
-                R.id.btnTransportBt  -> Transport.BLUETOOTH
-                else -> return@addOnButtonCheckedListener
-            }
-            if (picked == Prefs.getTransport(this)) return@addOnButtonCheckedListener  // no-op
+            if (!isChecked) return@addOnButtonCheckedListener // only react when something is selected
+            val picked =
+                when (checkedId) {
+                    R.id.btnTransportUsb -> Transport.USB
+                    R.id.btnTransportBt -> Transport.BLUETOOTH
+                    else -> return@addOnButtonCheckedListener
+                }
+            if (picked == Prefs.getTransport(this)) return@addOnButtonCheckedListener // no-op
             Prefs.setTransport(this, picked)
             updateBtPickerVisibility(picked)
             // Status pill shows the active transport — refresh on change
             updateShizukuStatus(
                 Shizuku.pingBinder() &&
-                Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED,
             )
             log("Transport set: ${picked.displayName}")
             if (serviceRunning) {
@@ -296,7 +315,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 9002 && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
             refreshBluetoothDevices()
@@ -319,9 +342,14 @@ class MainActivity : AppCompatActivity() {
         }
         // Show just the friendly name — the MAC address took an extra wrapped line
         // and the user never types it manually. Address is still saved to Prefs.
-        val labels = pairedBtDevices.map { dev ->
-            try { dev.name } catch (_: SecurityException) { null } ?: "Unknown"
-        }
+        val labels =
+            pairedBtDevices.map { dev ->
+                try {
+                    dev.name
+                } catch (_: SecurityException) {
+                    null
+                } ?: "Unknown"
+            }
         binding.dropdownBtDevice.setAdapter(nonFilteringAdapter(labels))
         binding.dropdownBtDevice.threshold = 0
 
@@ -344,44 +372,85 @@ class MainActivity : AppCompatActivity() {
      */
     private fun nonFilteringAdapter(items: List<String>): ArrayAdapter<String> =
         object : ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line, items) {
-            private val noFilter = object : Filter() {
-                override fun performFiltering(constraint: CharSequence?): FilterResults =
-                    FilterResults().apply { values = items; count = items.size }
-                override fun publishResults(constraint: CharSequence?, results: FilterResults?) {
-                    notifyDataSetChanged()
+            private val noFilter =
+                object : Filter() {
+                    override fun performFiltering(constraint: CharSequence?): FilterResults =
+                        FilterResults().apply {
+                            values = items
+                            count = items.size
+                        }
+
+                    override fun publishResults(
+                        constraint: CharSequence?,
+                        results: FilterResults?,
+                    ) {
+                        notifyDataSetChanged()
+                    }
                 }
-            }
+
             override fun getFilter(): Filter = noFilter
         }
 
     private fun refreshModeLabel() {
         val mode = ControllerService.modeFlow.value
-        binding.tvMode.text = when (mode) {
-            ControllerService.InjectionMode.UINPUT         -> "Mode: ${Prefs.getProfile(this).displayName} (uinput) ✓"
-            ControllerService.InjectionMode.SHIZUKU_INJECT -> "Mode: Shizuku inject (limited)"
-            ControllerService.InjectionMode.NONE           -> "Mode: —"
-        }
+        val backend = UInputNative.backendName(ControllerService.backendIdFlow.value)
+        val detail = ControllerService.backendDetailFlow.value
+        val profileName = Prefs.getProfile(this).displayName
+
+        binding.tvMode.text =
+            when (mode) {
+                ControllerService.InjectionMode.UINPUT,
+                ControllerService.InjectionMode.UHID,
+                -> {
+                    "Mode: $profileName ($backend) ✓"
+                }
+
+                // Say *why* input is limited instead of leaving it as an unexplained "limited".
+                ControllerService.InjectionMode.SHIZUKU_INJECT -> {
+                    buildString {
+                        append("Mode: Shizuku inject — some apps ignore input")
+                        if (detail.isNotEmpty()) append("\n$detail")
+                    }
+                }
+
+                ControllerService.InjectionMode.NONE -> {
+                    "Mode: —"
+                }
+            }
     }
 
     private fun showConnectionHelpDialog() {
         val view = layoutInflater.inflate(R.layout.dialog_connection_help, null)
 
-        fun fillBullet(id: Int, html: String) {
+        fun fillBullet(
+            id: Int,
+            html: String,
+        ) {
             val row = view.findViewById<View>(id)
             val tv = row.findViewById<android.widget.TextView>(R.id.bulletText)
             tv.text = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT)
         }
 
-        fillBullet(R.id.bulletPuckRight,
-            "<b>Puck (right slot)</b> — hold <b>A + R1 + Steam</b>, chime + white LED.")
-        fillBullet(R.id.bulletPuckLeft,
-            "<b>Puck (left slot)</b> — hold <b>A + L1 + Steam</b>, chime + white LED.")
-        fillBullet(R.id.bulletBluetooth,
-            "<b>Bluetooth</b> — hold <b>B + R1 + Steam</b>, chime + blue LED.")
-        fillBullet(R.id.bulletWiredOff,
-            "Controller is <b>off</b> — plug it into the device. Chime + green LED.")
-        fillBullet(R.id.bulletWiredOn,
-            "Controller is <b>on</b> in another mode — hold <b>Steam</b> while plugging it in. Chime + green LED.")
+        fillBullet(
+            R.id.bulletPuckRight,
+            "<b>Puck (right slot)</b> — hold <b>A + R1 + Steam</b>, chime + white LED.",
+        )
+        fillBullet(
+            R.id.bulletPuckLeft,
+            "<b>Puck (left slot)</b> — hold <b>A + L1 + Steam</b>, chime + white LED.",
+        )
+        fillBullet(
+            R.id.bulletBluetooth,
+            "<b>Bluetooth</b> — hold <b>B + R1 + Steam</b>, chime + blue LED.",
+        )
+        fillBullet(
+            R.id.bulletWiredOff,
+            "Controller is <b>off</b> — plug it into the device. Chime + green LED.",
+        )
+        fillBullet(
+            R.id.bulletWiredOn,
+            "Controller is <b>on</b> in another mode — hold <b>Steam</b> while plugging it in. Chime + green LED.",
+        )
 
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.help_dialog_title)
@@ -409,11 +478,12 @@ class MainActivity : AppCompatActivity() {
 
         binding.toggleControlMode.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
-            val picked = when (checkedId) {
-                R.id.btnModeGamepad -> Prefs.getLastGamepadProfile(this)
-                R.id.btnModeDesktop -> GamepadProfile.MOUSE
-                else -> return@addOnButtonCheckedListener
-            }
+            val picked =
+                when (checkedId) {
+                    R.id.btnModeGamepad -> Prefs.getLastGamepadProfile(this)
+                    R.id.btnModeDesktop -> GamepadProfile.MOUSE
+                    else -> return@addOnButtonCheckedListener
+                }
             if (picked.id == Prefs.getProfile(this).id) {
                 // No profile change, but the user still clicked — re-sync visibility
                 // in case the section was out of sync (e.g. service not running so
@@ -455,16 +525,20 @@ class MainActivity : AppCompatActivity() {
      * one of the 4 is ever checked at a time.
      */
     private fun setupGamepadVariantRadios() {
-        val radioToProfile = mapOf(
-            R.id.rbXbox360    to GamepadProfile.XBOX_360,
-            R.id.rbXboxOne    to GamepadProfile.XBOX_ONE,
-            R.id.rbDualShock4 to GamepadProfile.DUALSHOCK_4,
-            R.id.rbDualSense  to GamepadProfile.DUALSENSE,
-        )
+        val radioToProfile =
+            mapOf(
+                R.id.rbXbox360 to GamepadProfile.XBOX_360,
+                R.id.rbXboxOne to GamepadProfile.XBOX_ONE,
+                R.id.rbDualShock4 to GamepadProfile.DUALSHOCK_4,
+                R.id.rbDualSense to GamepadProfile.DUALSENSE,
+            )
         val row1 = binding.radioGroupGamepadRow1
         val row2 = binding.radioGroupGamepadRow2
 
-        fun onRowChecked(checkedId: Int, otherRow: RadioGroup?) {
+        fun onRowChecked(
+            checkedId: Int,
+            otherRow: RadioGroup?,
+        ) {
             val picked = radioToProfile[checkedId] ?: return
             otherRow?.clearCheck()
             if (picked.id == Prefs.getProfile(this).id) return
@@ -487,10 +561,10 @@ class MainActivity : AppCompatActivity() {
 
     /** Set the right radio to `checked = true` without triggering its listener side-effects. */
     private fun syncGamepadVariant(profile: GamepadProfile) {
-        binding.rbXbox360?.isChecked    = (profile == GamepadProfile.XBOX_360)
-        binding.rbXboxOne?.isChecked    = (profile == GamepadProfile.XBOX_ONE)
+        binding.rbXbox360?.isChecked = (profile == GamepadProfile.XBOX_360)
+        binding.rbXboxOne?.isChecked = (profile == GamepadProfile.XBOX_ONE)
         binding.rbDualShock4?.isChecked = (profile == GamepadProfile.DUALSHOCK_4)
-        binding.rbDualSense?.isChecked  = (profile == GamepadProfile.DUALSENSE)
+        binding.rbDualSense?.isChecked = (profile == GamepadProfile.DUALSENSE)
     }
 
     private fun openGithubRepo() {
@@ -519,11 +593,12 @@ class MainActivity : AppCompatActivity() {
             }
             if (!UpdateChecker.isNewer(release.versionName, BuildConfig.VERSION_NAME)) {
                 if (manual) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        getString(R.string.update_toast_up_to_date, BuildConfig.VERSION_NAME),
-                        Toast.LENGTH_SHORT,
-                    ).show()
+                    Toast
+                        .makeText(
+                            this@MainActivity,
+                            getString(R.string.update_toast_up_to_date, BuildConfig.VERSION_NAME),
+                            Toast.LENGTH_SHORT,
+                        ).show()
                 }
                 return@launch
             }
@@ -539,8 +614,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton(R.string.update_dialog_button_update) { _, _ -> downloadAndInstall(release) }
             .setNeutralButton(R.string.update_dialog_button_skip) { _, _ ->
                 Prefs.setSkippedUpdateVersion(this, release.versionName)
-            }
-            .setNegativeButton(R.string.update_dialog_button_later, null)
+            }.setNegativeButton(R.string.update_dialog_button_later, null)
             .show()
     }
 
@@ -551,10 +625,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val downloadManager = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
-        val request = DownloadManager.Request(Uri.parse(release.apkUrl))
-            .setTitle("Steam Controller ${release.versionName}")
-            .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, release.apkName)
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        val request =
+            DownloadManager
+                .Request(Uri.parse(release.apkUrl))
+                .setTitle("Steam Controller ${release.versionName}")
+                .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, release.apkName)
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
 
         pendingUpdateApkFile = File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), release.apkName)
         pendingUpdateDownloadId = downloadManager.enqueue(request)
@@ -567,13 +643,15 @@ class MainActivity : AppCompatActivity() {
                 log("Shizuku not running")
                 Toast.makeText(this, getString(R.string.shizuku_not_running), Toast.LENGTH_LONG).show()
             }
+
             Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED -> {
                 Shizuku.requestPermission(shizukuRequestCode)
             }
+
             else -> {
                 updateShizukuStatus(true)
                 when (Prefs.getTransport(this)) {
-                    Transport.USB       -> checkAndRequestUsb()
+                    Transport.USB -> checkAndRequestUsb()
                     Transport.BLUETOOTH -> startBluetoothService()
                 }
             }
@@ -595,9 +673,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkAndRequestUsb() {
         val usbManager = getSystemService(USB_SERVICE) as UsbManager
-        val device = usbManager.deviceList.values.firstOrNull {
-            it.vendorId == UsbConnectionManager.STEAM_VID
-        }
+        val device =
+            usbManager.deviceList.values.firstOrNull {
+                it.vendorId == UsbConnectionManager.STEAM_VID
+            }
 
         if (device == null) {
             log("No Steam Controller found — plug it in first")
@@ -608,11 +687,13 @@ class MainActivity : AppCompatActivity() {
         if (usbManager.hasPermission(device)) {
             startControllerService(device)
         } else {
-            val permIntent = PendingIntent.getBroadcast(
-                this, 0,
-                Intent(usbPermissionAction),
-                PendingIntent.FLAG_IMMUTABLE
-            )
+            val permIntent =
+                PendingIntent.getBroadcast(
+                    this,
+                    0,
+                    Intent(usbPermissionAction),
+                    PendingIntent.FLAG_IMMUTABLE,
+                )
             usbManager.requestPermission(device, permIntent)
             log("Requesting USB permission...")
         }
@@ -625,9 +706,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startControllerService(device: UsbDevice) {
-        val intent = Intent(this, ControllerService::class.java).apply {
-            putExtra(ControllerService.EXTRA_DEVICE, device)
-        }
+        val intent =
+            Intent(this, ControllerService::class.java).apply {
+                putExtra(ControllerService.EXTRA_DEVICE, device)
+            }
         startForegroundService(intent)
         serviceRunning = true
         // Pill colour + status text flip when stateFlow emits the first parsed HID frame.
@@ -636,9 +718,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopControllerService() {
-        val intent = Intent(this, ControllerService::class.java).apply {
-            action = ControllerService.ACTION_STOP
-        }
+        val intent =
+            Intent(this, ControllerService::class.java).apply {
+                action = ControllerService.ACTION_STOP
+            }
         startService(intent)
         serviceRunning = false
         hasSeenActiveMode = false
@@ -649,10 +732,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateShizukuStatus(ok: Boolean) {
         val transport = Prefs.getTransport(this).displayName
-        binding.tvShizukuStatus.text = if (ok)
-            "Shizuku: ready  •  $transport"
-        else
-            "Shizuku: not ready  •  $transport"
+        binding.tvShizukuStatus.text =
+            if (ok) {
+                "Shizuku: ready  •  $transport"
+            } else {
+                "Shizuku: not ready  •  $transport"
+            }
     }
 
     /**
@@ -663,14 +748,18 @@ class MainActivity : AppCompatActivity() {
     private fun updateStatus(connected: Boolean) {
         binding.tvControllerStatus.text = if (connected) "Controller: Ready" else "Controller: disconnected"
 
-        val containerColor = if (connected)
-            ContextCompat.getColor(this, R.color.status_connected_container)
-        else
-            ContextCompat.getColor(this, R.color.status_idle_container)
-        val textColor = if (connected)
-            ContextCompat.getColor(this, R.color.status_connected_on_container)
-        else
-            ContextCompat.getColor(this, R.color.status_idle_on_container)
+        val containerColor =
+            if (connected) {
+                ContextCompat.getColor(this, R.color.status_connected_container)
+            } else {
+                ContextCompat.getColor(this, R.color.status_idle_container)
+            }
+        val textColor =
+            if (connected) {
+                ContextCompat.getColor(this, R.color.status_connected_on_container)
+            } else {
+                ContextCompat.getColor(this, R.color.status_idle_on_container)
+            }
 
         // statusPillCard only exists in the phone layout; sw600dp/TV use a different layout.
         binding.statusPillCard?.setCardBackgroundColor(containerColor)
@@ -686,8 +775,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        updateShizukuStatus(Shizuku.pingBinder() &&
-            Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED)
+        updateShizukuStatus(
+            Shizuku.pingBinder() &&
+                Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED,
+        )
 
         // Sync Control Mode toggle — profile may have changed from the notification while paused
         syncControlModeToggle(Prefs.getProfile(this))

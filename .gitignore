@@ -57,3 +57,6 @@ desktop.ini
 # Claude Code workspace metadata (private)
 .claude/
 CLAUDE.md
+
+# AGP-generated native compile database (symlinked at the root for clangd/IDE use)
+compile_commands.json

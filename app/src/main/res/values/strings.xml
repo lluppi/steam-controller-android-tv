@@ -76,6 +76,7 @@
     <string name="calib_test_intensity">Test intensity</string>
     <string name="calib_intensity">Intensity</string>
     <string name="calib_test_rumble">Test rumble</string>
+    <string name="calib_rumble_unsupported">Rumble unavailable (needs uinput)</string>
     <string name="calib_desktop_header">DESKTOP MODE</string>
     <string name="calib_mouse_sensitivity">Mouse sensitivity</string>
     <string name="calib_trackpad_switch_label">Trackpads as mouse in Xbox/PS profiles</string>
