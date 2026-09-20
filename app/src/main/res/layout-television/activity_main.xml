@@ -399,6 +399,7 @@
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btnCalibration"
                 android:layout_width="0dp"
+                android:nextFocusUp="@id/btnToggleService"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="10dp"
                 android:layout_weight="1"
@@ -437,6 +438,7 @@
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btnMapping"
                 android:layout_width="0dp"
+                android:nextFocusUp="@id/btnToggleService"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="10dp"
                 android:layout_weight="1"
@@ -475,6 +477,7 @@
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btnGameProfiles"
                 android:layout_width="0dp"
+                android:nextFocusUp="@id/btnToggleService"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="10dp"
                 android:layout_weight="1"
@@ -513,6 +516,7 @@
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btnDebug"
                 android:layout_width="0dp"
+                android:nextFocusUp="@id/btnToggleService"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:clickable="true"

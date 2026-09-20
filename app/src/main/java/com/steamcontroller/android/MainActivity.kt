@@ -175,6 +175,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         setupTransportDropdown()
+        setupActionCardFocusMemory()
         setupControlModeToggle()
         setupGamepadVariantRadios()
         requestNotificationPermissionIfNeeded()
@@ -264,6 +265,30 @@ class MainActivity : AppCompatActivity() {
         if (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) {
             val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
             device?.let { onDeviceAttached(it) }
+        }
+    }
+
+    /**
+     * TV focus memory for the bottom action row.
+     *
+     * Going UP from a card to the Start/Stop button and then back DOWN should return you to
+     * the card you came from. Once Stop's DOWN hop is explicit (see the television layout)
+     * the framework's geometric search no longer picks the remembered card, so track it here.
+     */
+    private fun setupActionCardFocusMemory() {
+        val cards =
+            listOf(
+                binding.btnCalibration,
+                binding.btnMapping,
+                binding.btnGameProfiles,
+                binding.btnDebug
+            )
+        // Matches the layout's default; used until a card has been visited this session.
+        binding.btnToggleService.nextFocusDownId = binding.btnCalibration.id
+        for (card in cards) {
+            card.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) binding.btnToggleService.nextFocusDownId = card.id
+            }
         }
     }
 
