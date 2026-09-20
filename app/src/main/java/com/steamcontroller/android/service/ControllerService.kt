@@ -29,6 +29,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import rikka.shizuku.Shizuku
 
 class ControllerService : Service() {
     enum class InjectionMode {
@@ -199,11 +200,28 @@ class ControllerService : Service() {
      * is silent is indistinguishable from a broken one and the UI used to show a green card either
      * way.
      */
+
+    /** Shizuku's binder, defensively — the api throws when it is not ready. */
+    private fun shizukuRunning(): Boolean = try {
+        Shizuku.pingBinder()
+    } catch (_: Throwable) {
+        false
+    }
+
     private fun refreshLinkStatus() {
         val status =
             when {
                 mode == InjectionMode.NONE ->
-                    LinkStatus(LinkState.DISCONNECTED, "service stopped")
+                    if (shizukuRunning()) {
+                        LinkStatus(LinkState.DISCONNECTED, "service stopped")
+                    } else {
+                        // The post-reboot state on Android 9: there is no wireless-debugging
+                        // pairing, so Shizuku can only be started from a PC. Say so.
+                        LinkStatus(
+                            LinkState.DISCONNECTED,
+                            "Shizuku is not running — after a reboot, start it from a PC (see Help)"
+                        )
+                    }
 
                 mode == InjectionMode.SHIZUKU_INJECT ->
                     LinkStatus(LinkState.STALE, "inject fallback — most apps ignore input")
@@ -230,6 +248,13 @@ class ControllerService : Service() {
                         "link stalled — controller asleep, or hold B + R1 + Steam for a blue LED"
                     )
             }
+        if (_linkStatusFlow.value != status) {
+            Log.i(
+                TAG,
+                "link status: ${status.state}" +
+                    if (status.detail.isEmpty()) "" else " — ${status.detail}"
+            )
+        }
         _linkStatusFlow.value = status
     }
 
@@ -454,6 +479,9 @@ class ControllerService : Service() {
             )
             return START_STICKY
         }
+        // Must be set *before* the launch: otherwise two starts arriving in quick succession both
+        // pass the guard and initialize twice, which is the wedge this exists to prevent.
+        initializing = true
 
         scope.launch { initialize(device) }
         return START_STICKY

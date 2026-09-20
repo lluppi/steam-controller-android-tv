@@ -12,6 +12,10 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+
+    <!-- Start the controller service at boot (see BootReceiver). Shizuku still has to be
+         restarted by hand after a reboot: Android 9 has no wireless-debugging pairing. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Update checker: fetch latest GitHub release + download/install the signed APK. -->
@@ -96,6 +100,15 @@
             android:name=".AppPickerActivity"
             android:exported="false"
             android:parentActivityName=".ProfilesActivity" />
+
+        <receiver
+            android:name=".service.BootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".service.ControllerService"

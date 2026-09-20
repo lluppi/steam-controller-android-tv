@@ -47,6 +47,7 @@ object Prefs {
 
     private const val KEY_SAVED_SHOW_IME_HARD_KB = "saved_show_ime_with_hard_keyboard"
     private const val KEY_BACKEND_PREF = "output_backend_pref"
+    private const val KEY_START_ON_BOOT = "start_on_boot"
 
     private fun prefs(context: Context) = context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
 
@@ -80,6 +81,21 @@ object Prefs {
 
     fun setBackendPref(context: Context, pref: Int) {
         prefs(context).edit().putInt(KEY_BACKEND_PREF, pref).apply()
+    }
+
+    // ─── Start on boot ───────────────────────────────────────────────────────
+
+    /**
+     * Whether the controller service starts itself at boot. On by default: this is a background
+     * input service, so the cost is a notification. It cannot come up fully until Shizuku is
+     * running, which after a reboot means an adb command on Android 9 — the status card says so
+     * rather than leaving the user to guess.
+     */
+    fun getStartOnBoot(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_START_ON_BOOT, true)
+
+    fun setStartOnBoot(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_START_ON_BOOT, enabled).apply()
     }
 
     fun getTransport(context: Context): Transport =
