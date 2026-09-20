@@ -296,3 +296,39 @@ Start here, in this order:
 4. If you want the left-pad click: run the native-HID test in §5. That is the only unknown
    left.
 5. Otherwise, take the next plan item in §8 — P4.S2 is the smallest and most user-visible.
+
+---
+
+## Update — second pass (2026-09-21)
+
+### Also done now
+
+- **P4.S2 honest link status.** `linkStatusFlow` (DISCONNECTED / LINKED / STALE) derived from frame
+  liveness (3s), the Bluetooth connection state, and whether anything is bonded, each with a
+  reason string. The status card shows it, is clickable to reconnect (stop + start), and the
+  decision is logged on change — so it is verifiable from logcat instead of only on screen.
+  Verified: `DISCONNECTED → STALE (wireless-mode hint) → LINKED`.
+- **P4.S4 boot handling.** `BootReceiver` + `start_on_boot` (default on) + the honest post-reboot
+  message. Declared for BOOT_COMPLETED and the permission is granted. **BOOT_COMPLETED is
+  protected, so adb cannot fire it — exercise this with a real reboot.**
+- **P4.S3** wireless-mode guidance, folded into the STALE status text and a new README
+  Troubleshooting section.
+- **P5.S1** rescoped — **read `docs/retroarch.md` before touching RetroArch profiles.** Upstream
+  already matches this pad and the autoconfig dir is not writable by the app.
+- **P5.S2** back paddles default to L3/R3. **P5.S3** `scripts/retroarch-cfg.sh`.
+- **P7.S1** version 2.1-shield + `CHANGELOG.md`. **P7.S2** CI.
+- The duplicate-start guard had a bug of its own (`initializing = true` was missing) — fixed, and
+  verified by starting twice: 1 initialization, 3 duplicates ignored.
+
+### Extra gotchas from this pass
+
+- Through `run-as`, **`am stop-service`, `am start-foreground-service` and `am broadcast` all need
+  `--user 0`**, or they fail with `service/broadcast asks to run as user -2`.
+- **`BOOT_COMPLETED` is a protected broadcast** — it cannot be fired from adb for testing.
+- **`uiautomator dump` wedges** with `null root node` after heavy use. Log what you want to observe
+  instead of scraping the UI; that is why the link status is logged.
+- A TV **screensaver** (`Sys2023:dream`) can be the focused window, so check `mCurrentFocus` before
+  trusting a dump.
+- The state report is **46 bytes** on current firmware with the button field in bytes 2-5 (all zero
+  when idle) — but note the caveat in §6: the length has differed between sessions, so pin offsets
+  to the report id before drawing conclusions from byte positions.

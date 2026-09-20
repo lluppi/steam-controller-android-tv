@@ -597,3 +597,35 @@ cosmetic churn to the seven Kotlin files in `5a8695d`. A repo `.editorconfig` no
 *declares* the intended style for real ktlint/IDE/CI runs, but the agent-side auto-fix
 does not honour it. Before opening the upstream PRs (P7.S3), either run `ktlintFormat`
 once in a dedicated whitespace-only commit, or review those PRs with `git diff -w`.
+
+## Progress — second pass (2026-09-21)
+
+Done since the status note above, all committed:
+
+- **P4.S2 honest link status** — `ControllerService.LinkStatus` derived from frame liveness,
+  Bluetooth state and whether anything is bonded, with a reason per case; only `LINKED` gets the
+  connected styling and the status card doubles as reconnect. Verified on the device:
+  DISCONNECTED → STALE (with the wireless-mode hint) → LINKED, and the decision is logged when it
+  changes so it is verifiable from logcat rather than from the screen.
+- **P4.S3 wireless-mode guidance** — folded into the stalled-link status text (`hold B + R1 +
+  Steam for a blue LED`) plus a new README Troubleshooting section.
+- **P4.S4 boot handling** — `BootReceiver` + `start_on_boot` preference (on by default) + the
+  honest post-reboot Shizuku message. Registration verified on the device; a real reboot is still
+  needed to exercise it, because `BOOT_COMPLETED` is a protected broadcast that adb cannot fire.
+- **P5.S1** — rescoped to `docs/retroarch.md` after recon: upstream's own
+  `Microsoft_XBOX_360_Controller.cfg` already matches this pad's name and IDs exactly, and
+  `joypad_autoconfig_dir` sits inside RetroArch's private data where the app cannot write.
+- **P5.S2** — back paddles default to L4→L3, R4→R3.
+- **P5.S3** — `scripts/retroarch-cfg.sh` (pull/push/guard/show).
+- **P7.S1** — versionCode 3 / versionName `2.1-shield`, `CHANGELOG.md`, README pass (architecture
+  diagram, troubleshooting, corrected limitations, roadmap).
+- **P7.S2** — CI workflow, pinned action SHAs, least privilege.
+
+Also fixed a bug in the duplicate-start guard itself (`initializing = true` was never set), which
+is exactly the wedge that guard exists to prevent. Verified by starting the service twice in quick
+succession: 1 initialization, 3 duplicates ignored.
+
+Still open: **P0.S1** (choose the fork's GitHub repo name and wire `origin`), **P3.S5** (profile
+switching and lifecycle parity — needs a controller), the left trackpad click (`HANDOVER.md` §5),
+the `Buttons` constant audit, the Shizuku user-service leak, the ktlint churn cleanup before any
+upstream PR, and **P6** (rumble).
