@@ -463,12 +463,17 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     /** Right trackpad delta (in mouse-cursor units). Resets cleanly on lift-off. */
     private fun computeRightPadDelta(state: SteamControllerState): Pair<Int, Int> {
         val touching = state.isButtonPressed(Buttons.TP_RT)
-        if (!touching) {
+        val curX = state.rightPadX.toInt()
+        val curY = state.rightPadY.toInt()
+        // Lifting a finger does not clear the touch flag in the same report that zeroes the
+        // coordinates: the pad reads (0,0) for a frame or two while the flag is still set.
+        // Treating that as motion computes a delta of -(last position), which drags the cursor
+        // straight back to where the swipe began the moment the finger leaves the pad. A real
+        // finger sitting exactly on the pad's electrical centre is not a thing.
+        if (!touching || (curX == 0 && curY == 0)) {
             rightPadHadContact = false
             return 0 to 0
         }
-        val curX = state.rightPadX.toInt()
-        val curY = state.rightPadY.toInt()
         var relX = 0
         var relY = 0
         if (rightPadHadContact) {
@@ -486,12 +491,15 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     /** Left trackpad vertical → wheel ticks. One tick per ~1000 accumulator units. */
     private fun computeLeftPadScroll(state: SteamControllerState): Int {
         val touching = state.isButtonPressed(Buttons.TP_LT)
-        if (!touching) {
+        val curY = state.leftPadY.toInt()
+        val curX = state.leftPadX.toInt()
+        // Same lift artefact as the right pad: zeroed coordinates with the touch flag still set
+        // would add one big reverse step to the scroll accumulator as the finger leaves.
+        if (!touching || (curX == 0 && curY == 0)) {
             leftPadHadContact = false
             scrollAccumulator = 0
             return 0
         }
-        val curY = state.leftPadY.toInt()
         if (leftPadHadContact) {
             // Y positive = up on SC2026; scroll wheel positive = up → keep sign.
             scrollAccumulator += (curY - lastLeftPadY) / 8

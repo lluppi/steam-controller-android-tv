@@ -410,17 +410,21 @@ class ControllerService : Service() {
             Log.e(TAG, "No paired Bluetooth Steam Controller selected")
             return false
         }
-        val mgr = getSystemService(BluetoothManager::class.java)
-        val device =
-            try {
-                mgr?.adapter?.getRemoteDevice(address)
-            } catch (t: Throwable) {
-                Log.e(TAG, "Invalid BT address $address: ${t.message}")
-                return false
-            }
+
+        // Resolve the controller from the bonded list instead of trusting the cached address.
+        // A BLE peripheral is given a fresh random address every time it is paired, so after a
+        // re-pair the cached address refers to a device that no longer exists: getRemoteDevice()
+        // still returns an object for it, connectGatt() then never succeeds, and the app retries
+        // forever. This is why clearing app data used to be part of the fix-up ritual.
+        val bonded = btManager.listPairedSteamControllers()
+        val device = bonded.firstOrNull { it.address == address } ?: bonded.firstOrNull()
         if (device == null) {
-            Log.e(TAG, "No remote device for $address")
+            Log.e(TAG, "No bonded Steam Controller found (cached address: $address)")
             return false
+        }
+        if (device.address != address) {
+            Log.i(TAG, "Controller address changed ($address → ${device.address}), updating")
+            Prefs.setBluetoothAddress(this, device.address)
         }
 
         btManager.connect(
