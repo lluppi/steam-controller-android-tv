@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.SteamController" parent="Theme.Material3.DayNight.NoActionBar">
+    <!-- Always dark, deliberately NOT a DayNight parent: the palette below is a fixed dark
+         one, so DayNight was a bug. When the device is not in night mode it resolves to the
+         LIGHT scheme, and anything that falls back to android:textColorPrimary — or the
+         light-mode ripple / focus-highlight colours — then renders dark-on-dark. This is an
+         Android TV UI that has no light variant. -->
+    <style name="Theme.SteamController" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">#66C0F4</item>
         <item name="colorOnPrimary">#000000</item>
         <item name="colorPrimaryContainer">#2A475E</item>
@@ -11,8 +16,15 @@
         <item name="colorOnSurface">#FFFFFF</item>
         <item name="colorSurfaceVariant">#2A475E</item>
         <item name="colorOnSurfaceVariant">#C6D4DF</item>
-        <item name="android:windowBackground">#1B2838</item>
-        <item name="android:statusBarColor">#1B2838</item>
-        <item name="android:navigationBarColor">#1B2838</item>
+        <item name="android:windowBackground">@color/window_bg</item>
+        <item name="android:colorBackground">@color/window_bg</item>
+        <item name="android:statusBarColor">@color/window_bg</item>
+        <item name="android:navigationBarColor">@color/window_bg</item>
+
+        <!-- Framework (non-Material) widgets read these instead of colorOnSurface, so state
+             them explicitly rather than relying on the parent scheme being dark. -->
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#C6D4DF</item>
+        <item name="android:textColorTertiary">#8F98A0</item>
     </style>
 </resources>

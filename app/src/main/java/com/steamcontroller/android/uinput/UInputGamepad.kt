@@ -16,16 +16,13 @@ import com.steamcontroller.android.input.SystemActions
 import com.steamcontroller.android.input.XboxTarget
 import com.steamcontroller.android.parser.Buttons
 import com.steamcontroller.android.parser.SteamControllerState
-import rikka.shizuku.Shizuku
 import kotlin.math.abs
+import rikka.shizuku.Shizuku
 
 // High-level Kotlin API for the virtual gamepad + mouse/keyboard sidecar.
 // Binds UInputService through Shizuku, translates SC2026 state into frames, and reports
 // which output backend the shell-UID process ended up using (uinput or uhid).
-class UInputGamepad(
-    private val context: Context,
-    initialProfile: GamepadProfile,
-) {
+class UInputGamepad(private val context: Context, initialProfile: GamepadProfile) {
     private val TAG = "UInputGamepad"
 
     companion object {
@@ -112,7 +109,7 @@ class UInputGamepad(
     private val args =
         Shizuku
             .UserServiceArgs(
-                ComponentName(context.packageName, UInputService::class.java.name),
+                ComponentName(context.packageName, UInputService::class.java.name)
             ).daemon(false)
             .processNameSuffix("uinput")
             .debuggable(false)
@@ -124,10 +121,7 @@ class UInputGamepad(
 
     private val connection =
         object : ServiceConnection {
-            override fun onServiceConnected(
-                name: ComponentName?,
-                binder: IBinder?,
-            ) {
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                 val svc = IUInputService.Stub.asInterface(binder)
                 service = svc
                 Log.i(TAG, "UInputService connected")
@@ -196,14 +190,19 @@ class UInputGamepad(
             if (Prefs.getSavedShowImeHardKeyboard(context) == null) {
                 val current =
                     try {
-                        svc.runShellCommandForOutput(arrayOf("settings", "get", "secure", "show_ime_with_hard_keyboard"))
+                        svc.runShellCommandForOutput(
+                            arrayOf("settings", "get", "secure", "show_ime_with_hard_keyboard")
+                        )
                     } catch (_: Throwable) {
                         null
                     }
-                val toSave = current?.takeIf { it.isNotBlank() && it != "null" } ?: SHOW_IME_UNSET_SENTINEL
+                val toSave =
+                    current?.takeIf { it.isNotBlank() && it != "null" } ?: SHOW_IME_UNSET_SENTINEL
                 Prefs.setSavedShowImeHardKeyboard(context, toSave)
             }
-            svc.runShellCommand(arrayOf("settings", "put", "secure", "show_ime_with_hard_keyboard", "1"))
+            svc.runShellCommand(
+                arrayOf("settings", "put", "secure", "show_ime_with_hard_keyboard", "1")
+            )
             Log.i(TAG, "show_ime_with_hard_keyboard forced on")
         } catch (t: Throwable) {
             Log.w(TAG, "applyShowImeOverride failed: ${t.message}")
@@ -214,9 +213,13 @@ class UInputGamepad(
         try {
             val saved = Prefs.getSavedShowImeHardKeyboard(context) ?: return
             if (saved == SHOW_IME_UNSET_SENTINEL) {
-                svc.runShellCommand(arrayOf("settings", "delete", "secure", "show_ime_with_hard_keyboard"))
+                svc.runShellCommand(
+                    arrayOf("settings", "delete", "secure", "show_ime_with_hard_keyboard")
+                )
             } else {
-                svc.runShellCommand(arrayOf("settings", "put", "secure", "show_ime_with_hard_keyboard", saved))
+                svc.runShellCommand(
+                    arrayOf("settings", "put", "secure", "show_ime_with_hard_keyboard", saved)
+                )
             }
             Prefs.clearSavedShowImeHardKeyboard(context)
             Log.i(TAG, "show_ime_with_hard_keyboard restored to '$saved'")
@@ -388,7 +391,7 @@ class UInputGamepad(
                 lt,
                 rt,
                 dpadX,
-                dpadY,
+                dpadY
             )
         } catch (t: Throwable) {
             Log.e(TAG, "sendFrame IPC failed: ${t.message}")
@@ -410,7 +413,7 @@ class UInputGamepad(
     private fun pushSidecarFrame(
         svc: IUInputService,
         state: SteamControllerState,
-        mappedKeys: Int,
+        mappedKeys: Int
     ) {
         val (relX, relY, scrollTicks) =
             if (cachedTrackpadAsMouse) {
@@ -488,10 +491,7 @@ class UInputGamepad(
      * face/system buttons → mapped keys, DPAD → arrow keys, left pad click → right mouse.
      * Special actions (e.g. SCREENSHOT) still fire via the gamepad mapping.
      */
-    private fun pushMouseFrame(
-        svc: IUInputService,
-        state: SteamControllerState,
-    ) {
+    private fun pushMouseFrame(svc: IUInputService, state: SteamControllerState) {
         // Right trackpad → cursor delta; left trackpad vertical → scroll wheel.
         // Same helpers as the gamepad sidecar mode so the gesture is identical.
         val (relX, relY) = computeRightPadDelta(state)

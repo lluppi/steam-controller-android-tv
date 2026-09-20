@@ -23,45 +23,40 @@ class UInputService : IUInputService.Stub {
         Log.i(TAG, "UInputService instantiated (Context=$context)")
     }
 
-    override fun selectBackend(preferred: Int): Int =
-        try {
-            UInputNative.selectBackend(preferred)
-        } catch (t: Throwable) {
-            Log.e(TAG, "selectBackend failed: ${t.message}")
-            UInputNative.Backend.NONE
-        }
+    override fun selectBackend(preferred: Int): Int = try {
+        UInputNative.selectBackend(preferred)
+    } catch (t: Throwable) {
+        Log.e(TAG, "selectBackend failed: ${t.message}")
+        UInputNative.Backend.NONE
+    }
 
-    override fun getBackend(): Int =
-        try {
-            UInputNative.currentBackend()
-        } catch (t: Throwable) {
-            Log.e(TAG, "getBackend failed: ${t.message}")
-            UInputNative.Backend.NONE
-        }
+    override fun getBackend(): Int = try {
+        UInputNative.currentBackend()
+    } catch (t: Throwable) {
+        Log.e(TAG, "getBackend failed: ${t.message}")
+        UInputNative.Backend.NONE
+    }
 
-    override fun getBackendDetail(): String =
-        try {
-            UInputNative.backendDetail()
-        } catch (t: Throwable) {
-            Log.e(TAG, "getBackendDetail failed: ${t.message}")
-            "unavailable: ${t.message}"
-        }
+    override fun getBackendDetail(): String = try {
+        UInputNative.backendDetail()
+    } catch (t: Throwable) {
+        Log.e(TAG, "getBackendDetail failed: ${t.message}")
+        "unavailable: ${t.message}"
+    }
 
-    override fun supportsRumble(): Boolean =
-        try {
-            UInputNative.supportsRumble()
-        } catch (t: Throwable) {
-            Log.e(TAG, "supportsRumble failed: ${t.message}")
-            false
-        }
+    override fun supportsRumble(): Boolean = try {
+        UInputNative.supportsRumble()
+    } catch (t: Throwable) {
+        Log.e(TAG, "supportsRumble failed: ${t.message}")
+        false
+    }
 
-    override fun createGamepad(profileId: Int): Boolean =
-        try {
-            UInputNative.createDevice(profileId)
-        } catch (t: Throwable) {
-            Log.e(TAG, "createDevice failed: ${t.message}")
-            false
-        }
+    override fun createGamepad(profileId: Int): Boolean = try {
+        UInputNative.createDevice(profileId)
+    } catch (t: Throwable) {
+        Log.e(TAG, "createDevice failed: ${t.message}")
+        false
+    }
 
     override fun sendFrame(
         buttons: Int,
@@ -72,7 +67,7 @@ class UInputService : IUInputService.Stub {
         leftTrigger: Int,
         rightTrigger: Int,
         dpadX: Int,
-        dpadY: Int,
+        dpadY: Int
     ) {
         try {
             UInputNative.sendFrame(
@@ -84,19 +79,14 @@ class UInputService : IUInputService.Stub {
                 leftTrigger,
                 rightTrigger,
                 dpadX,
-                dpadY,
+                dpadY
             )
         } catch (t: Throwable) {
             Log.e(TAG, "sendFrame failed: ${t.message}")
         }
     }
 
-    override fun sendMouseFrame(
-        relX: Int,
-        relY: Int,
-        scrollY: Int,
-        keys: Int,
-    ) {
+    override fun sendMouseFrame(relX: Int, relY: Int, scrollY: Int, keys: Int) {
         try {
             UInputNative.sendMouseFrame(relX, relY, scrollY, keys)
         } catch (t: Throwable) {
@@ -104,13 +94,12 @@ class UInputService : IUInputService.Stub {
         }
     }
 
-    override fun pollForceFeedback(): IntArray? =
-        try {
-            UInputNative.pollFFEvent()
-        } catch (t: Throwable) {
-            Log.e(TAG, "pollFFEvent failed: ${t.message}")
-            null
-        }
+    override fun pollForceFeedback(): IntArray? = try {
+        UInputNative.pollFFEvent()
+    } catch (t: Throwable) {
+        Log.e(TAG, "pollFFEvent failed: ${t.message}")
+        null
+    }
 
     override fun runShellCommand(cmd: Array<String>?): Int {
         if (cmd.isNullOrEmpty()) return -1

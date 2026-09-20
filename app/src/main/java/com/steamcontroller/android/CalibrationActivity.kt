@@ -79,7 +79,7 @@ class CalibrationActivity : AppCompatActivity() {
                 val pct = value.toInt()
                 binding.tvRumbleIntensity.text = "$pct%"
                 Prefs.setRumbleIntensity(this, pct)
-            },
+            }
         )
 
         // Mouse sensitivity slider — only relevant in Desktop profile but always visible
@@ -90,7 +90,7 @@ class CalibrationActivity : AppCompatActivity() {
             Slider.OnChangeListener { _, value, _ ->
                 binding.tvMouseSensitivity.text = "%.1f×".format(value)
                 Prefs.setMouseSensitivity(this, value)
-            },
+            }
         )
 
         // Trackpads-as-mouse toggle (active alongside Xbox/PS profiles only).
@@ -143,7 +143,7 @@ class CalibrationActivity : AppCompatActivity() {
                 binding.padLeft.deadzoneFraction = leftCal.deadzonePercent / 100f
                 binding.padLeft.invalidate()
                 saveLeft()
-            },
+            }
         )
 
         binding.sliderRightDeadzone.addOnChangeListener(
@@ -153,7 +153,7 @@ class CalibrationActivity : AppCompatActivity() {
                 binding.padRight.deadzoneFraction = rightCal.deadzonePercent / 100f
                 binding.padRight.invalidate()
                 saveRight()
-            },
+            }
         )
 
         binding.switchLeftInvertY.setOnCheckedChangeListener { _, checked ->

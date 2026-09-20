@@ -25,12 +25,11 @@ object UInputNative {
     }
 
     /** Display name for a [Backend] id — used in logs and the UI. */
-    fun backendName(id: Int): String =
-        when (id) {
-            Backend.UINPUT -> "uinput"
-            Backend.UHID -> "uhid"
-            else -> "none"
-        }
+    fun backendName(id: Int): String = when (id) {
+        Backend.UINPUT -> "uinput"
+        Backend.UHID -> "uhid"
+        else -> "none"
+    }
 
     /** Probe the backends and adopt one. Returns the chosen [Backend] id. */
     external fun selectBackend(preferred: Int): Int
@@ -57,16 +56,11 @@ object UInputNative {
         leftTrigger: Int,
         rightTrigger: Int,
         dpadX: Int,
-        dpadY: Int,
+        dpadY: Int
     )
 
     /** Desktop mode frame. `keys` is a MouseTarget bitmask. */
-    external fun sendMouseFrame(
-        relX: Int,
-        relY: Int,
-        scrollY: Int,
-        keys: Int,
-    )
+    external fun sendMouseFrame(relX: Int, relY: Int, scrollY: Int, keys: Int)
 
     external fun destroy()
 }

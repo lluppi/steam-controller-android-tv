@@ -35,7 +35,7 @@ class ControllerService : Service() {
         NONE,
         UINPUT,
         UHID,
-        SHIZUKU_INJECT,
+        SHIZUKU_INJECT
         ;
 
         /**
@@ -200,7 +200,10 @@ class ControllerService : Service() {
             return
         }
 
-        Log.i(TAG, "Auto-switch → '${bound.name}' (foreground=$current, activeMatches=$activeMatches, liveMatches=$liveProfileMatches)")
+        Log.i(
+            TAG,
+            "Auto-switch → '${bound.name}' (foreground=$current, activeMatches=$activeMatches, liveMatches=$liveProfileMatches)"
+        )
         Prefs.applyNamedProfile(this, bound)
         announceProfileLoaded(bound.name)
 
@@ -241,7 +244,7 @@ class ControllerService : Service() {
                 .makeText(
                     applicationContext,
                     "Game Profile loaded: $profileName",
-                    android.widget.Toast.LENGTH_LONG,
+                    android.widget.Toast.LENGTH_LONG
                 ).show()
         }
         // Notification refresh happens via refreshNotification() in the caller
@@ -275,10 +278,7 @@ class ControllerService : Service() {
      * Throttled: we re-send at most every 50ms if the magnitudes change, or every
      * 200ms if they're the same (keep-alive for long-lasting effects).
      */
-    private fun forwardRumble(
-        strong: Int,
-        weak: Int,
-    ) {
+    private fun forwardRumble(strong: Int, weak: Int) {
         // Apply user-configured intensity (0..100% of game-requested magnitude)
         val intensity = Prefs.getRumbleIntensity(this)
         val scaledStrong = (strong * intensity / 100).coerceIn(0, 0xFFFF)
@@ -292,7 +292,10 @@ class ControllerService : Service() {
         lastRumbleWeak = scaledWeak
         lastRumbleSentAt = now
 
-        Log.v(TAG, "Rumble → controller: strong=$scaledStrong weak=$scaledWeak (intensity=$intensity%)")
+        Log.v(
+            TAG,
+            "Rumble → controller: strong=$scaledStrong weak=$scaledWeak (intensity=$intensity%)"
+        )
         when (Prefs.getTransport(this)) {
             Transport.BLUETOOTH -> {
                 btManager.sendRumble(scaledStrong, scaledWeak)
@@ -307,11 +310,7 @@ class ControllerService : Service() {
         }
     }
 
-    override fun onStartCommand(
-        intent: Intent?,
-        flags: Int,
-        startId: Int,
-    ): Int {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             stopSelf()
             return START_NOT_STICKY
@@ -331,7 +330,7 @@ class ControllerService : Service() {
             startForeground(
                 NOTIFICATION_ID,
                 buildNotification(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
             )
         } else {
             startForeground(NOTIFICATION_ID, buildNotification())
@@ -395,7 +394,7 @@ class ControllerService : Service() {
                 conn,
                 ep,
                 onReport = { state, raw -> onHidFrame(state, raw) },
-                onError = { msg -> Log.e(TAG, "USB read error: $msg") },
+                onError = { msg -> Log.e(TAG, "USB read error: $msg") }
             )
         reader?.start(scope)
         return true
@@ -432,7 +431,7 @@ class ControllerService : Service() {
             },
             onConnectionChange = { connected ->
                 Log.i(TAG, "BT connection state: $connected")
-            },
+            }
         )
 
         heartbeatJob =
@@ -445,10 +444,7 @@ class ControllerService : Service() {
         return true
     }
 
-    private fun onHidFrame(
-        state: SteamControllerState,
-        raw: ByteArray,
-    ) {
+    private fun onHidFrame(state: SteamControllerState, raw: ByteArray) {
         _stateFlow.value = state
         _rawReportFlow.value = raw
 
@@ -485,16 +481,21 @@ class ControllerService : Service() {
                         InjectionMode.UHID
                     } else {
                         InjectionMode.UINPUT
-                    },
+                    }
                 )
                 Log.i(
                     TAG,
                     "Using ${UInputNative.backendName(uinput.backendId)} virtual gamepad " +
-                        "(${Prefs.getProfile(this@ControllerService).displayName}) — ${uinput.backendDetail}",
+                        "(${Prefs.getProfile(
+                            this@ControllerService
+                        ).displayName}) — ${uinput.backendDetail}"
                 )
                 return
             }
-            Log.w(TAG, "No virtual output backend (${uinput.backendDetail}), falling back to inject")
+            Log.w(
+                TAG,
+                "No virtual output backend (${uinput.backendDetail}), falling back to inject"
+            )
             uinput.unbind()
         } catch (t: Throwable) {
             _backendDetailFlow.value = "virtual output error: ${t.message}"
@@ -562,7 +563,12 @@ class ControllerService : Service() {
             try {
                 if (mode.isVirtualDevice) {
                     val ok = uinput.switchProfile(next)
-                    if (!ok) Log.w(TAG, "switchProfile failed; the gamepad may need a service restart")
+                    if (!ok) {
+                        Log.w(
+                            TAG,
+                            "switchProfile failed; the gamepad may need a service restart"
+                        )
+                    }
                 }
                 _profileFlow.value = next.id
                 refreshNotification()
@@ -588,7 +594,9 @@ class ControllerService : Service() {
         val buttonsConfirmedThisFrame: Boolean
         if (injectableBits == pendingButtons) {
             pendingFrames++
-            if (pendingFrames >= DEBOUNCE_FRAMES && injectableBits != (confirmedState!!.buttons and INJECTABLE_MASK)) {
+            if (pendingFrames >= DEBOUNCE_FRAMES &&
+                injectableBits != (confirmedState!!.buttons and INJECTABLE_MASK)
+            ) {
                 confirmedState = state
                 buttonsConfirmedThisFrame = true
             } else {
@@ -602,7 +610,7 @@ class ControllerService : Service() {
 
         when (mode) {
             InjectionMode.UINPUT,
-            InjectionMode.UHID,
+            InjectionMode.UHID
             -> {
                 // Combine confirmed buttons with current raw axes — the frame is atomic.
                 // Desktop / mouse mode bypasses the gamepad debounce: the trackpad touch flag
@@ -623,8 +631,8 @@ class ControllerService : Service() {
                     GamepadMapper.axes(
                         state,
                         Prefs.getLeftCalibration(this),
-                        Prefs.getRightCalibration(this),
-                    ),
+                        Prefs.getRightCalibration(this)
+                    )
                 )
                 // Buttons only on debounced change
                 if (buttonsConfirmedThisFrame) {
@@ -665,7 +673,7 @@ class ControllerService : Service() {
             NotificationChannel(
                 CHANNEL_ID,
                 getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_LOW,
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Shows controller status and active emulation profile"
                 setShowBadge(false)
@@ -682,7 +690,7 @@ class ControllerService : Service() {
         val modeText =
             when (mode) {
                 InjectionMode.UINPUT,
-                InjectionMode.UHID,
+                InjectionMode.UHID
                 -> getString(R.string.notif_mode_uinput, profile.displayName)
 
                 InjectionMode.SHIZUKU_INJECT -> getString(R.string.notif_mode_inject)
@@ -709,7 +717,7 @@ class ControllerService : Service() {
                 this,
                 0,
                 openIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
         val stopIntent =
@@ -717,7 +725,7 @@ class ControllerService : Service() {
                 this,
                 1,
                 Intent(this, ControllerService::class.java).apply { action = ACTION_STOP },
-                PendingIntent.FLAG_IMMUTABLE,
+                PendingIntent.FLAG_IMMUTABLE
             )
         val stopAction =
             Notification.Action
@@ -725,7 +733,7 @@ class ControllerService : Service() {
                     android.graphics.drawable.Icon
                         .createWithResource(this, android.R.drawable.ic_media_pause),
                     getString(android.R.string.cancel),
-                    stopIntent,
+                    stopIntent
                 ).build()
 
         // "Switch profile" action: cycles to the next emulated controller (virtual devices only).
@@ -734,7 +742,7 @@ class ControllerService : Service() {
                 this,
                 2,
                 Intent(this, ControllerService::class.java).apply { action = ACTION_NEXT_PROFILE },
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
         val nextLabel =
             if (mode.isVirtualDevice) {
@@ -752,13 +760,13 @@ class ControllerService : Service() {
                     android.graphics.drawable.Icon
                         .createWithResource(this, android.R.drawable.ic_menu_rotate),
                     nextLabel,
-                    nextProfileIntent,
+                    nextProfileIntent
                 ).build()
 
         val icon =
             when (mode) {
                 InjectionMode.UINPUT,
-                InjectionMode.UHID,
+                InjectionMode.UHID
                 -> android.R.drawable.ic_media_play
 
                 InjectionMode.SHIZUKU_INJECT -> android.R.drawable.ic_media_play

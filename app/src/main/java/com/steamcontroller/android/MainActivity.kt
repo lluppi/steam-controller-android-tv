@@ -32,10 +32,10 @@ import com.steamcontroller.android.uinput.UInputNative
 import com.steamcontroller.android.update.UpdateChecker
 import com.steamcontroller.android.update.UpdateInstaller
 import com.steamcontroller.android.usb.UsbConnectionManager
-import kotlinx.coroutines.launch
-import rikka.shizuku.Shizuku
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.launch
+import rikka.shizuku.Shizuku
 
 class MainActivity : AppCompatActivity() {
     private val TAG = "MainActivity"
@@ -56,19 +56,25 @@ class MainActivity : AppCompatActivity() {
 
     private val usbReceiver =
         object : BroadcastReceiver() {
-            override fun onReceive(
-                context: Context,
-                intent: Intent,
-            ) {
+            override fun onReceive(context: Context, intent: Intent) {
                 when (intent.action) {
                     usbPermissionAction -> {
-                        val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                        val granted = intent.getBooleanExtra(
+                            UsbManager.EXTRA_PERMISSION_GRANTED,
+                            false
+                        )
                         if (granted) {
-                            val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+                            val device: UsbDevice? = intent.getParcelableExtra(
+                                UsbManager.EXTRA_DEVICE
+                            )
                             device?.let { startControllerService(it) }
                         } else {
                             log("USB permission denied")
-                            Toast.makeText(this@MainActivity, "USB permission denied", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                this@MainActivity,
+                                "USB permission denied",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     }
 
@@ -88,10 +94,7 @@ class MainActivity : AppCompatActivity() {
 
     private val downloadReceiver =
         object : BroadcastReceiver() {
-            override fun onReceive(
-                context: Context,
-                intent: Intent,
-            ) {
+            override fun onReceive(context: Context, intent: Intent) {
                 val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
                 if (id == -1L || id != pendingUpdateDownloadId) return
                 val apkFile = pendingUpdateApkFile ?: return
@@ -111,7 +114,11 @@ class MainActivity : AppCompatActivity() {
                 checkAndRequestUsb()
             } else {
                 log("Shizuku permission denied")
-                Toast.makeText(this, getString(R.string.shizuku_permission_denied), Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this,
+                    getString(R.string.shizuku_permission_denied),
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
 
@@ -130,12 +137,17 @@ class MainActivity : AppCompatActivity() {
                 addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
                 addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
             }
-        ContextCompat.registerReceiver(this, usbReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        ContextCompat.registerReceiver(
+            this,
+            usbReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         ContextCompat.registerReceiver(
             this,
             downloadReceiver,
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
+            ContextCompat.RECEIVER_NOT_EXPORTED
         )
 
         binding.btnToggleService.setOnClickListener {
@@ -280,7 +292,8 @@ class MainActivity : AppCompatActivity() {
             // Status pill shows the active transport — refresh on change
             updateShizukuStatus(
                 Shizuku.pingBinder() &&
-                    Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED,
+                    Shizuku.checkSelfPermission() ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
             )
             log("Transport set: ${picked.displayName}")
             if (serviceRunning) {
@@ -301,10 +314,14 @@ class MainActivity : AppCompatActivity() {
     private fun ensureBluetoothPermissionThenRefresh() {
         val needed = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
                 needed += Manifest.permission.BLUETOOTH_CONNECT
             }
-            if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
                 needed += Manifest.permission.BLUETOOTH_SCAN
             }
         }
@@ -318,7 +335,7 @@ class MainActivity : AppCompatActivity() {
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
-        grantResults: IntArray,
+        grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 9002 && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
@@ -335,7 +352,9 @@ class MainActivity : AppCompatActivity() {
         }
         pairedBtDevices = BluetoothHidManager(this).listPairedSteamControllers()
         if (pairedBtDevices.isEmpty()) {
-            binding.dropdownBtDevice.setAdapter(nonFilteringAdapter(listOf("No paired Steam Controller found")))
+            binding.dropdownBtDevice.setAdapter(
+                nonFilteringAdapter(listOf("No paired Steam Controller found"))
+            )
             binding.dropdownBtDevice.setText("No paired Steam Controller found", false)
             log("No Steam Controller paired — pair via Android Bluetooth settings first")
             return
@@ -354,7 +373,9 @@ class MainActivity : AppCompatActivity() {
         binding.dropdownBtDevice.threshold = 0
 
         val savedAddress = Prefs.getBluetoothAddress(this)
-        val currentIdx = pairedBtDevices.indexOfFirst { it.address == savedAddress }.coerceAtLeast(0)
+        val currentIdx = pairedBtDevices.indexOfFirst {
+            it.address == savedAddress
+        }.coerceAtLeast(0)
         binding.dropdownBtDevice.setText(labels[currentIdx], false)
         Prefs.setBluetoothAddress(this, pairedBtDevices[currentIdx].address)
 
@@ -382,7 +403,7 @@ class MainActivity : AppCompatActivity() {
 
                     override fun publishResults(
                         constraint: CharSequence?,
-                        results: FilterResults?,
+                        results: FilterResults?
                     ) {
                         notifyDataSetChanged()
                     }
@@ -400,7 +421,7 @@ class MainActivity : AppCompatActivity() {
         binding.tvMode.text =
             when (mode) {
                 ControllerService.InjectionMode.UINPUT,
-                ControllerService.InjectionMode.UHID,
+                ControllerService.InjectionMode.UHID
                 -> {
                     "Mode: $profileName ($backend) ✓"
                 }
@@ -422,10 +443,7 @@ class MainActivity : AppCompatActivity() {
     private fun showConnectionHelpDialog() {
         val view = layoutInflater.inflate(R.layout.dialog_connection_help, null)
 
-        fun fillBullet(
-            id: Int,
-            html: String,
-        ) {
+        fun fillBullet(id: Int, html: String) {
             val row = view.findViewById<View>(id)
             val tv = row.findViewById<android.widget.TextView>(R.id.bulletText)
             tv.text = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT)
@@ -433,23 +451,23 @@ class MainActivity : AppCompatActivity() {
 
         fillBullet(
             R.id.bulletPuckRight,
-            "<b>Puck (right slot)</b> — hold <b>A + R1 + Steam</b>, chime + white LED.",
+            "<b>Puck (right slot)</b> — hold <b>A + R1 + Steam</b>, chime + white LED."
         )
         fillBullet(
             R.id.bulletPuckLeft,
-            "<b>Puck (left slot)</b> — hold <b>A + L1 + Steam</b>, chime + white LED.",
+            "<b>Puck (left slot)</b> — hold <b>A + L1 + Steam</b>, chime + white LED."
         )
         fillBullet(
             R.id.bulletBluetooth,
-            "<b>Bluetooth</b> — hold <b>B + R1 + Steam</b>, chime + blue LED.",
+            "<b>Bluetooth</b> — hold <b>B + R1 + Steam</b>, chime + blue LED."
         )
         fillBullet(
             R.id.bulletWiredOff,
-            "Controller is <b>off</b> — plug it into the device. Chime + green LED.",
+            "Controller is <b>off</b> — plug it into the device. Chime + green LED."
         )
         fillBullet(
             R.id.bulletWiredOn,
-            "Controller is <b>on</b> in another mode — hold <b>Steam</b> while plugging it in. Chime + green LED.",
+            "Controller is <b>on</b> in another mode — hold <b>Steam</b> while plugging it in. Chime + green LED."
         )
 
         MaterialAlertDialogBuilder(this)
@@ -461,7 +479,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val granted = checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        val granted =
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
         if (!granted) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 9001)
         }
@@ -530,15 +550,12 @@ class MainActivity : AppCompatActivity() {
                 R.id.rbXbox360 to GamepadProfile.XBOX_360,
                 R.id.rbXboxOne to GamepadProfile.XBOX_ONE,
                 R.id.rbDualShock4 to GamepadProfile.DUALSHOCK_4,
-                R.id.rbDualSense to GamepadProfile.DUALSENSE,
+                R.id.rbDualSense to GamepadProfile.DUALSENSE
             )
         val row1 = binding.radioGroupGamepadRow1
         val row2 = binding.radioGroupGamepadRow2
 
-        fun onRowChecked(
-            checkedId: Int,
-            otherRow: RadioGroup?,
-        ) {
+        fun onRowChecked(checkedId: Int, otherRow: RadioGroup?) {
             val picked = radioToProfile[checkedId] ?: return
             otherRow?.clearCheck()
             if (picked.id == Prefs.getProfile(this).id) return
@@ -556,7 +573,10 @@ class MainActivity : AppCompatActivity() {
             if (checkedId != View.NO_ID) onRowChecked(checkedId, row1)
         }
         // Initial check based on current pref.
-        syncGamepadVariant(Prefs.getProfile(this).takeUnless { it.isMouseMode } ?: Prefs.getLastGamepadProfile(this))
+        syncGamepadVariant(
+            Prefs.getProfile(this).takeUnless { it.isMouseMode }
+                ?: Prefs.getLastGamepadProfile(this)
+        )
     }
 
     /** Set the right radio to `checked = true` without triggering its listener side-effects. */
@@ -587,7 +607,11 @@ class MainActivity : AppCompatActivity() {
             val release = UpdateChecker.fetchLatestRelease()
             if (release == null) {
                 if (manual) {
-                    Toast.makeText(this@MainActivity, R.string.update_toast_check_failed, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this@MainActivity,
+                        R.string.update_toast_check_failed,
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
                 return@launch
             }
@@ -597,12 +621,16 @@ class MainActivity : AppCompatActivity() {
                         .makeText(
                             this@MainActivity,
                             getString(R.string.update_toast_up_to_date, BuildConfig.VERSION_NAME),
-                            Toast.LENGTH_SHORT,
+                            Toast.LENGTH_SHORT
                         ).show()
                 }
                 return@launch
             }
-            if (!manual && Prefs.getSkippedUpdateVersion(this@MainActivity) == release.versionName) return@launch
+            if (!manual &&
+                Prefs.getSkippedUpdateVersion(this@MainActivity) == release.versionName
+            ) {
+                return@launch
+            }
             showUpdateAvailableDialog(release)
         }
     }
@@ -611,7 +639,9 @@ class MainActivity : AppCompatActivity() {
         MaterialAlertDialogBuilder(this)
             .setTitle(getString(R.string.update_dialog_title))
             .setMessage(release.notes.ifBlank { release.tagName })
-            .setPositiveButton(R.string.update_dialog_button_update) { _, _ -> downloadAndInstall(release) }
+            .setPositiveButton(R.string.update_dialog_button_update) { _, _ ->
+                downloadAndInstall(release)
+            }
             .setNeutralButton(R.string.update_dialog_button_skip) { _, _ ->
                 Prefs.setSkippedUpdateVersion(this, release.versionName)
             }.setNegativeButton(R.string.update_dialog_button_later, null)
@@ -620,7 +650,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun downloadAndInstall(release: UpdateChecker.ReleaseInfo) {
         if (!UpdateInstaller.canInstall(this)) {
-            Toast.makeText(this, R.string.update_toast_grant_install_permission, Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                R.string.update_toast_grant_install_permission,
+                Toast.LENGTH_LONG
+            ).show()
             UpdateInstaller.requestInstallPermission(this)
             return
         }
@@ -629,10 +663,17 @@ class MainActivity : AppCompatActivity() {
             DownloadManager
                 .Request(Uri.parse(release.apkUrl))
                 .setTitle("Steam Controller ${release.versionName}")
-                .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, release.apkName)
-                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalFilesDir(
+                    this,
+                    Environment.DIRECTORY_DOWNLOADS,
+                    release.apkName
+                )
+                .setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                )
 
-        pendingUpdateApkFile = File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), release.apkName)
+        pendingUpdateApkFile =
+            File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), release.apkName)
         pendingUpdateDownloadId = downloadManager.enqueue(request)
         Toast.makeText(this, R.string.update_toast_downloading, Toast.LENGTH_SHORT).show()
     }
@@ -641,7 +682,11 @@ class MainActivity : AppCompatActivity() {
         when {
             !Shizuku.pingBinder() -> {
                 log("Shizuku not running")
-                Toast.makeText(this, getString(R.string.shizuku_not_running), Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this,
+                    getString(R.string.shizuku_not_running),
+                    Toast.LENGTH_LONG
+                ).show()
             }
 
             Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED -> {
@@ -692,7 +737,7 @@ class MainActivity : AppCompatActivity() {
                     this,
                     0,
                     Intent(usbPermissionAction),
-                    PendingIntent.FLAG_IMMUTABLE,
+                    PendingIntent.FLAG_IMMUTABLE
                 )
             usbManager.requestPermission(device, permIntent)
             log("Requesting USB permission...")
@@ -746,7 +791,8 @@ class MainActivity : AppCompatActivity() {
      * a much more honest signal than "the user pressed Start".
      */
     private fun updateStatus(connected: Boolean) {
-        binding.tvControllerStatus.text = if (connected) "Controller: Ready" else "Controller: disconnected"
+        binding.tvControllerStatus.text =
+            if (connected) "Controller: Ready" else "Controller: disconnected"
 
         val containerColor =
             if (connected) {
@@ -777,7 +823,8 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updateShizukuStatus(
             Shizuku.pingBinder() &&
-                Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED,
+                Shizuku.checkSelfPermission() ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
         )
 
         // Sync Control Mode toggle — profile may have changed from the notification while paused

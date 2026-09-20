@@ -1,5 +1,5 @@
-import java.util.Properties
 import java.io.FileInputStream
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -56,9 +56,9 @@ android {
     signingConfigs {
         create("release") {
             val storeFilePath = signingValue("storeFile", "SIGNING_STORE_FILE")
-            val storePass     = signingValue("storePassword", "SIGNING_STORE_PASSWORD")
-            val alias         = signingValue("keyAlias", "SIGNING_KEY_ALIAS")
-            val keyPass       = signingValue("keyPassword", "SIGNING_KEY_PASSWORD")
+            val storePass = signingValue("storePassword", "SIGNING_STORE_PASSWORD")
+            val alias = signingValue("keyAlias", "SIGNING_KEY_ALIAS")
+            val keyPass = signingValue("keyPassword", "SIGNING_KEY_PASSWORD")
 
             if (storeFilePath != null && storePass != null && alias != null && keyPass != null) {
                 storeFile = rootProject.file(storeFilePath)
@@ -70,9 +70,21 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Install side by side with any existing build instead of replacing it. A debug
+            // build is signed with a different key, so an in-place upgrade is impossible and
+            // adb would have to uninstall first — which would take the user's calibrations,
+            // mappings and named profiles with it. Release builds keep the real application
+            // id, so this only affects debug installs.
+            applicationIdSuffix = ".debug"
+        }
+
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             val cfg = signingConfigs.getByName("release")
             // Only attach the signing config if it was actually populated above.
             if (cfg.storeFile != null) {
