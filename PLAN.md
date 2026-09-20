@@ -539,3 +539,40 @@ C0  C0
 | P5 | new `retroarch/autoconfig/android/*.cfg`, `input/ButtonMapping.kt` defaults, `scripts/retroarch-cfg.sh`, README |
 | P6 | `cpp/uhid_backend.cpp` (UHID_OUTPUT → FF), `CalibrationActivity.kt` |
 | P7 | `app/build.gradle.kts`, `CHANGELOG.md`, README, `.github/workflows/build.yml` |
+
+---
+
+## Status (2026-09-20)
+
+### Done and verified
+
+- **P0.S2 toolchain.** JDK 17 at `~/.local/jdk17` (Adoptium, no sudo), SDK at
+  `~/Android/Sdk` (platform 35, build-tools 35.0.0, NDK 26.1.10909125, cmake 3.22.1),
+  `org.gradle.java.home` pinned in `~/.gradle/gradle.properties`, `sdk.dir` in the
+  gitignored `local.properties`. `./gradlew :app:assembleDebug` is green.
+- **P2 + P3** (code only) — committed as `5a8695d` on `shield-uhid`. Backend seam
+  (`output_backend.h`), the uhid backend, the AIDL change, and the Kotlin/UI wiring.
+  The commit message is the design record.
+- `compile_commands.json` is symlinked at the repo root (gitignored) so clangd and the
+  lsp/diagnostic tools resolve the NDK sysroot. Without it every C++ file is reported as
+  `android/log.h` / `jni.h` not found — a bare-host-clang artifact, not a code error.
+  Regenerate via any native build: `app/.cxx/Debug/*/arm64-v8a/compile_commands.json`.
+
+### Not done — and why
+
+- **P1 (the spike) is still the gate and has not run.** Nothing here is device-verified:
+  the uhid backend compiles, is wired, and its descriptors and report packing are
+  written against the kernel's documented behaviour — but **not one report has ever been
+  written to `/dev/uhid`**. Until P1.S3 passes, treat P2/P3 as unproven on hardware.
+- **P0.S3 is blocked on a human.** `adb connect $SHIELD` returns `unauthorized`: the
+  device needs the key prompt accepted on screen, and only the TV remote can dismiss it.
+  Nothing on the device has been touched yet.
+
+### Known wart
+
+pi-lens' ktlint auto-fix applies the `ktlint_official` style on every file write and
+reformats whole files, while upstream uses IntelliJ/Android-Studio style. That added
+cosmetic churn to the seven Kotlin files in `5a8695d`. A repo `.editorconfig` now
+*declares* the intended style for real ktlint/IDE/CI runs, but the agent-side auto-fix
+does not honour it. Before opening the upstream PRs (P7.S3), either run `ktlintFormat`
+once in a dedicated whitespace-only commit, or review those PRs with `git diff -w`.
