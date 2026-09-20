@@ -15,12 +15,8 @@
     <color name="status_idle_container">#3A2A2D</color>
     <color name="status_idle_on_container">#E5BAB4</color>
 
-    <!-- Classic Xbox 360 face-button colours, used to tint the target chip in MappingActivity rows. -->
+    <!-- Classic Xbox 360 face-button colour, used to tint the target chip in MappingActivity rows. -->
     <color name="btn_xbox_a">#5CC04C</color>
-    <color name="btn_xbox_b">#E6432A</color>
-    <color name="btn_xbox_x">#3FB2EA</color>
-    <color name="btn_xbox_y">#F5C518</color>
     <!-- Neutral grey for non-face targets (bumpers, sticks, system) and the SC source chip. -->
     <color name="btn_neutral">#E8E8E8</color>
-    <color name="btn_neutral_dark">#5A6F7A</color>
 </resources>

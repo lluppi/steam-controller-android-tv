@@ -6,8 +6,6 @@
     <string name="status_link_lost">Controller: link lost — %1$s</string>
     <string name="status_disconnected_reason">Controller: disconnected — %1$s</string>
     <string name="reconnecting">Reconnecting…</string>
-    <string name="status_connected">Controller connected</string>
-    <string name="status_running">Controller active</string>
     <string name="shizuku_not_running">Shizuku is not running. Please start Shizuku first.</string>
     <string name="shizuku_permission_denied">Shizuku permission denied.</string>
     <string name="btn_start">Start Service</string>
@@ -17,10 +15,8 @@
     <string name="help_dialog_title">Switching connection modes</string>
     <string name="notification_channel_name">Controller Service</string>
     <string name="notification_title">Steam Controller</string>
-    <string name="notification_text">Starting…</string>
     <string name="notif_mode_uinput">Emulating %1$s</string>
     <string name="notif_mode_inject">Fallback: Shizuku inject (limited)</string>
-    <string name="notif_mode_none">No injection method available</string>
     <string name="notif_starting">Connecting…</string>
 
     <!-- ━━━━━━━━━━━━ MainActivity ━━━━━━━━━━━━ -->
