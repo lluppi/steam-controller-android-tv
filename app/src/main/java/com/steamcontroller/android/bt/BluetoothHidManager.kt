@@ -92,6 +92,12 @@ class BluetoothHidManager(private val context: Context) {
     private var consecutiveStalls = 0
     private var lastRebondAt = 0L
 
+    // True once a handshake has completed in this service session. A controller that is merely
+    // asleep behaves exactly like a wedged one — it answers at the link layer, then stops
+    // answering GATT — so a re-bond is only justified if this pairing demonstrably worked and
+    // then stopped.
+    private var hadReadySession = false
+
     val isBluetoothAvailable: Boolean get() = adapter != null && adapter.isEnabled
 
     fun listPairedSteamControllers(): List<BluetoothDevice> {
@@ -144,22 +150,11 @@ class BluetoothHidManager(private val context: Context) {
         if (!reconnectEnabled) return
         val device = resolveTarget()
         if (device == null) {
-            // Nothing is bonded: we are sitting mid-repair (the escalation dropped the bond and the
-            // controller was not reachable to complete it). Re-arm the pairing — the backoff paces
-            // it, and a controller paired by hand simply shows up in the bonded list first.
-            targetDevice?.let { remembered ->
-                if (remembered.bondState == BluetoothDevice.BOND_NONE) {
-                    try {
-                        Log.i(
-                            TAG,
-                            "Not bonded — re-arming createBond() for ${safeName(remembered)}"
-                        )
-                        remembered.createBond()
-                    } catch (t: Throwable) {
-                        Log.w(TAG, "createBond failed: ${t.message}")
-                    }
-                }
-            }
+            // Nothing is bonded. Do NOT drive createBond() from here: repeatedly starting pairing
+            // keeps the Bluetooth stack busy enough to starve the rest of the system — on the
+            // Shield it left the UI and even the BLE remote unresponsive until the app was
+            // force-stopped. Log it and let the user pair once, which is a single clean operation.
+            Log.w(TAG, "No bonded Steam Controller — pair it again from Bluetooth settings")
             return
         }
         reconnectAttempts++
@@ -270,6 +265,14 @@ class BluetoothHidManager(private val context: Context) {
      */
     private fun escalateRebond(reason: String) {
         val device = targetDevice ?: return
+        if (!hadReadySession) {
+            Log.w(
+                TAG,
+                "Not escalating ($reason): no handshake has ever completed with this pairing, " +
+                    "so this is an absent or sleeping controller rather than a wedged link"
+            )
+            return
+        }
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastRebondAt < REBOND_COOLDOWN_MS) {
             Log.w(TAG, "Link still wedged ($reason), but a re-bond was attempted recently")
@@ -712,6 +715,7 @@ class BluetoothHidManager(private val context: Context) {
             // earn its own escalation.
             reconnectAttempts = 0
             consecutiveStalls = 0
+            hadReadySession = true
             if (ch == null) {
                 Log.w(TAG, "No feature write char; skipping disable lizard")
                 // Notify-only battery char never pushes until its value changes on the
