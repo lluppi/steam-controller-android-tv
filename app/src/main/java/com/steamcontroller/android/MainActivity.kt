@@ -17,7 +17,6 @@ import android.util.Log
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Filter
-import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -198,24 +197,22 @@ class MainActivity : AppCompatActivity() {
 
         maybeAutoCheckForUpdates()
 
-        // Observe injection mode changes from the service.
-        // Also detect the service being stopped externally (e.g. via the notification action)
-        // and re-sync MainActivity's UI state so the button flips back to "Start".
-        //
-        // Subtlety: a fresh `collect` on a StateFlow immediately replays its current value,
-        // which is `NONE` when no service ever ran. If the user taps Start *before* that
-        // initial replay runs on the Main thread, we'd see `mode==NONE && serviceRunning==true`
-        // and incorrectly reset the button back to "Start". `hasSeenActiveMode` defends
-        // against that — we only treat a NONE as "service stopped" once we've previously
-        // observed a working mode in this session.
+        // One collector for the service's whole state. It used to be four (mode, profile, battery,
+        // link) that could disagree with each other, and every new piece of state meant hand-syncing
+        // another collector.
         lifecycleScope.launch {
-            ControllerService.modeFlow.collect { mode ->
-                refreshModeLabel()
-
-                if (mode != ControllerService.InjectionMode.NONE) {
+            ControllerService.serviceStateFlow.collect { state ->
+                // Mode → the toggle button, and detect the service being stopped externally (e.g. via
+                // the notification action) so the button flips back to "Start".
+                //
+                // Subtlety: a fresh `collect` on a StateFlow immediately replays its current value,
+                // which is NONE when no service ever ran. If the user taps Start before that replay
+                // runs, we would see mode==NONE && serviceRunning==true and wrongly reset the button.
+                // `hasSeenActiveMode` defends against that: a NONE only counts as "stopped" once a
+                // working mode has been seen in this session.
+                if (state.mode != ControllerService.InjectionMode.NONE) {
                     hasSeenActiveMode = true
-                    // Catch-up sync: activity re-entered while service was already running.
-                    // Without this, the toggle button stays "Start" even though the service is live.
+                    // Catch-up sync: the activity was re-entered while the service was already up.
                     if (!serviceRunning) {
                         serviceRunning = true
                         binding.btnToggleService.text = getString(R.string.btn_stop)
@@ -223,44 +220,20 @@ class MainActivity : AppCompatActivity() {
                 } else if (serviceRunning && hasSeenActiveMode) {
                     serviceRunning = false
                     hasSeenActiveMode = false
-                    updateStatus()
                     binding.btnToggleService.text = getString(R.string.btn_start)
                     log("Service stopped")
                 }
-            }
-        }
 
-        // Observe profile changes — e.g. when the user cycles via the notification action.
-        // We need a dedicated flow because modeFlow doesn't re-emit when the profile changes within UINPUT.
-        lifecycleScope.launch {
-            ControllerService.profileFlow.collect { profileId ->
-                if (profileId == null) return@collect
-                val profile =
-                    com.steamcontroller.android.uinput.GamepadProfile
-                        .fromId(profileId)
-                syncControlModeToggle(profile)
+                // Profile changes (e.g. cycling via the notification action) move the control-mode
+                // toggle as well.
+                state.profileId?.let { id -> syncControlModeToggle(GamepadProfile.fromId(id)) }
+
+                binding.tvBattery.text =
+                    state.batteryPercent?.let { "Battery: $it%" } ?: "Battery: —"
+
                 refreshModeLabel()
+                updateStatus()
             }
-        }
-
-        // Observe battery level from the controller (parsed from each state report)
-        lifecycleScope.launch {
-            ControllerService.batteryFlow.collect { pct ->
-                binding.tvBattery.text = if (pct == null) "Battery: —" else "Battery: $pct%"
-            }
-        }
-
-        // Observe real connection state — `stateFlow` only carries a non-null value
-        // once at least one HID frame has been parsed from the controller. That's the
-        // signal we trust for "controller actually plugged in / paired and streaming".
-        lifecycleScope.launch {
-            ControllerService.stateFlow.collect { updateStatus() }
-        }
-
-        // Honest link status: recomputed by the service from actual frame liveness, so the card
-        // stops claiming health while the controller is silent.
-        lifecycleScope.launch {
-            ControllerService.linkStatusFlow.collect { updateStatus() }
         }
 
         // Handle intent if launched by USB attach event
@@ -459,13 +432,12 @@ class MainActivity : AppCompatActivity() {
         }
 
     private fun refreshModeLabel() {
-        val mode = ControllerService.modeFlow.value
-        val backend = UInputNative.backendName(ControllerService.backendIdFlow.value)
-        val detail = ControllerService.backendDetailFlow.value
+        val state = ControllerService.serviceStateFlow.value
+        val backend = UInputNative.backendName(state.backend)
         val profileName = Prefs.getProfile(this).displayName
 
         binding.tvMode.text =
-            when (mode) {
+            when (state.mode) {
                 ControllerService.InjectionMode.UINPUT,
                 ControllerService.InjectionMode.UHID
                 -> {
@@ -476,7 +448,7 @@ class MainActivity : AppCompatActivity() {
                 ControllerService.InjectionMode.SHIZUKU_INJECT -> {
                     buildString {
                         append("Mode: Shizuku inject — some apps ignore input")
-                        if (detail.isNotEmpty()) append("\n$detail")
+                        if (state.backendDetail.isNotEmpty()) append("\n${state.backendDetail}")
                     }
                 }
 
@@ -590,47 +562,23 @@ class MainActivity : AppCompatActivity() {
      * 1 of 2") within its row; the two rows are cross-cleared manually so only
      * one of the 4 is ever checked at a time.
      */
+
+    /**
+     * The variant picker is hidden: this fork emulates one gamepad identity.
+     *
+     * The uhid backend hands the kernel a single Xbox 360 HID descriptor and only varies the
+     * advertised VID/PID and name, so a "DualShock 4" or "DualSense" option could never behave
+     * like one — it advertised Sony IDs with an Xbox descriptor, no touchpad and nothing else those
+     * pads are matched on. Desktop mode is not a variant: it is a different device set with its own
+     * toggle.
+     */
     private fun setupGamepadVariantRadios() {
-        val radioToProfile =
-            mapOf(
-                R.id.rbXbox360 to GamepadProfile.XBOX_360,
-                R.id.rbXboxOne to GamepadProfile.XBOX_ONE,
-                R.id.rbDualShock4 to GamepadProfile.DUALSHOCK_4,
-                R.id.rbDualSense to GamepadProfile.DUALSENSE
-            )
-        val row1 = binding.radioGroupGamepadRow1
-        val row2 = binding.radioGroupGamepadRow2
-
-        fun onRowChecked(checkedId: Int, otherRow: RadioGroup?) {
-            val picked = radioToProfile[checkedId] ?: return
-            otherRow?.clearCheck()
-            if (picked.id == Prefs.getProfile(this).id) return
-            Prefs.setProfile(this, picked)
-            log("Emulated controller → ${picked.displayName}")
-            if (serviceRunning) {
-                Toast.makeText(this, "Restart the service to apply", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        row1?.setOnCheckedChangeListener { _, checkedId ->
-            if (checkedId != View.NO_ID) onRowChecked(checkedId, row2)
-        }
-        row2?.setOnCheckedChangeListener { _, checkedId ->
-            if (checkedId != View.NO_ID) onRowChecked(checkedId, row1)
-        }
-        // Initial check based on current pref.
-        syncGamepadVariant(
-            Prefs.getProfile(this).takeUnless { it.isMouseMode }
-                ?: Prefs.getLastGamepadProfile(this)
-        )
+        binding.gamepadVariantSection?.visibility = View.GONE
     }
 
     /** Set the right radio to `checked = true` without triggering its listener side-effects. */
     private fun syncGamepadVariant(profile: GamepadProfile) {
         binding.rbXbox360?.isChecked = (profile == GamepadProfile.XBOX_360)
-        binding.rbXboxOne?.isChecked = (profile == GamepadProfile.XBOX_ONE)
-        binding.rbDualShock4?.isChecked = (profile == GamepadProfile.DUALSHOCK_4)
-        binding.rbDualSense?.isChecked = (profile == GamepadProfile.DUALSENSE)
     }
 
     private fun openGithubRepo() {
@@ -642,12 +590,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun maybeAutoCheckForUpdates() {
+        // The update channel is off in this fork (UpdateChecker.REPO is null), so there is nothing
+        // to check and no reason to burn the once-a-day timer on it.
+        if (!UpdateChecker.isEnabled()) return
         val elapsed = System.currentTimeMillis() - Prefs.getLastUpdateCheckAt(this)
         if (elapsed < TimeUnit.HOURS.toMillis(24)) return
         checkForUpdates(manual = false)
     }
 
     private fun checkForUpdates(manual: Boolean) {
+        if (!UpdateChecker.isEnabled()) {
+            if (manual) {
+                Toast.makeText(this, R.string.update_disabled, Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         lifecycleScope.launch {
             Prefs.setLastUpdateCheckAt(this@MainActivity, System.currentTimeMillis())
             val release = UpdateChecker.fetchLatestRelease()
@@ -843,7 +800,7 @@ class MainActivity : AppCompatActivity() {
      * that is exactly what the old version showed. Only LINKED gets the connected styling.
      */
     private fun updateStatus() {
-        val status = ControllerService.linkStatusFlow.value
+        val status = ControllerService.serviceStateFlow.value.link
         binding.tvControllerStatus.text =
             when (status.state) {
                 ControllerService.LinkState.LINKED -> getString(R.string.status_ready)

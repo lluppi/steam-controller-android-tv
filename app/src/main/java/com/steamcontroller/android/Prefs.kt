@@ -254,9 +254,9 @@ object Prefs {
                 ?: emptyList()
         return NamedProfile(
             id =
-                existingId ?: java.util.UUID
-                    .randomUUID()
-                    .toString(),
+            existingId ?: java.util.UUID
+                .randomUUID()
+                .toString(),
             name = name,
             profileId = getProfile(context).id,
             transport = 0, // unused — see captureCurrentAsProfile kdoc

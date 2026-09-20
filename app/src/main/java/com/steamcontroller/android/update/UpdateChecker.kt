@@ -1,10 +1,10 @@
 package com.steamcontroller.android.update
 
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * Checks GitHub Releases for a newer signed APK than the one currently installed.
@@ -12,21 +12,33 @@ import java.net.URL
  */
 object UpdateChecker {
 
-    private const val API_URL =
-        "https://api.github.com/repos/SonicDX12/SteamController-Android/releases/latest"
+    /**
+     * Update channel. **Disabled in this fork.**
+     *
+     * This pointed straight at upstream's releases, which on a fork is worse than having no updater
+     * at all: it would fetch and offer to install a build without this fork's changes — here, the
+     * entire uhid backend. Set [REPO] to this fork's own `owner/name` to turn it back on.
+     */
+    private val REPO: String? = null
+
+    private fun apiUrl(): String? = REPO?.let { "https://api.github.com/repos/$it/releases/latest" }
+
+    /** False when this build has no update channel configured. */
+    fun isEnabled(): Boolean = apiUrl() != null
 
     data class ReleaseInfo(
         val tagName: String,
         val versionName: String,
         val notes: String,
         val apkUrl: String,
-        val apkName: String,
+        val apkName: String
     )
 
     /** Fetches the latest GitHub release. Returns null on any network/parsing failure. */
     suspend fun fetchLatestRelease(): ReleaseInfo? = withContext(Dispatchers.IO) {
+        val apiUrl = apiUrl() ?: return@withContext null
         try {
-            val connection = (URL(API_URL).openConnection() as HttpURLConnection).apply {
+            val connection = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 setRequestProperty("Accept", "application/vnd.github+json")
                 connectTimeout = 10_000
@@ -49,7 +61,7 @@ object UpdateChecker {
                 versionName = tag.removePrefix("v"),
                 notes = json.optString("body", ""),
                 apkUrl = apkAsset.getString("browser_download_url"),
-                apkName = apkAsset.getString("name"),
+                apkName = apkAsset.getString("name")
             )
         } catch (_: Exception) {
             null

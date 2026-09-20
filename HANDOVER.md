@@ -253,8 +253,17 @@ From `PLAN.md`:
 style on every file write and reformatted whole files, so several Kotlin files carry cosmetic
 churn that fights upstream's IntelliJ style (it turned `BLUETOOTH(1, "Bluetooth");` into a
 dangling `;` on its own line). A repo `.editorconfig` was added declaring the intended style but
-the agent-side auto-fix does not honour it. Run `ktlintFormat` once in a dedicated
-whitespace-only commit, or review those PRs with `git diff -w`.
+the agent-side auto-fix does not honour it; review those PRs with `git diff -w`.
+
+**ktlint cannot simply be "fixed" on this codebase, and that was measured.** The Gradle ktlint
+plugin was wired up and run: upstream violates its *standard* ruleset throughout — max line length
+(100), `multiline-if-else`, `statement-wrapping`, `no-semi`, `trailing-comma-on-call-site`,
+`function-literal` — in files this fork never touched (`AppPickerActivity`, `BackupManager`,
+`GamepadMapper`, `SteamReportParser`, `ShizukuInputInjector`, `UsageStatsHelper`, …).
+`ktlintFormat` therefore rewrote ~16 unrelated upstream files, which had to be reverted, and a
+`ktlintCheck` in CI would fail on day one. So the plugin was removed again. Adopting ktlint is a
+deliberate whole-codebase decision — one dedicated formatting commit, reviewed with `git diff -w`
+— not something to bolt on as a cleanup.
 
 ## 9. Incident log (what actually happened, and why)
 

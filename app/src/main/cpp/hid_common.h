@@ -40,12 +40,12 @@ struct gamepad_profile {
     bool mouse_mode;  // true = Desktop profile: mouse + keyboard, no gamepad
 };
 
+// Emulated identities. One gamepad plus the Desktop device set, deliberately: the uhid backend
+// sends a single Xbox 360 HID report descriptor and only varies VID/PID/name, so other pad
+// identities could never actually behave like the device they claimed to be. See GamepadProfile.kt.
 inline const gamepad_profile PROFILES[] = {
-    { 0, 0x045E, 0x028E, "Microsoft X-Box 360 pad",                                    false },
-    { 1, 0x045E, 0x02EA, "Microsoft Xbox One Controller",                              false },
-    { 2, 0x054C, 0x05C4, "Sony Interactive Entertainment Wireless Controller",          false },
-    { 3, 0x054C, 0x0CE6, "Sony Interactive Entertainment DualSense Wireless Controller", false },
-    { 4, 0x046D, 0xC077, "Steam Controller Desktop",                                   true  },
+    { 0, 0x045E, 0x028E, "Microsoft X-Box 360 pad", false },
+    { 4, 0x046D, 0xC077, "Steam Controller Desktop", true },
 };
 
 inline const gamepad_profile& find_profile(int id) {

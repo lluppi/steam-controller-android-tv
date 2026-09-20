@@ -46,11 +46,11 @@ class CalibrationActivity : AppCompatActivity() {
         // implements it (hid-generic provides none for the uhid descriptors), so rather than
         // offer a control that cannot do anything, disable it and say why.
         lifecycleScope.launch {
-            ControllerService.rumbleSupportedFlow.collect { supported ->
-                binding.btnTestRumble.isEnabled = supported
-                binding.sliderRumbleIntensity.isEnabled = supported
+            ControllerService.serviceStateFlow.collect { state ->
+                binding.btnTestRumble.isEnabled = state.rumbleSupported
+                binding.sliderRumbleIntensity.isEnabled = state.rumbleSupported
                 binding.btnTestRumble.text =
-                    if (supported) {
+                    if (state.rumbleSupported) {
                         getString(R.string.calib_test_rumble)
                     } else {
                         getString(R.string.calib_rumble_unsupported)
@@ -59,7 +59,9 @@ class CalibrationActivity : AppCompatActivity() {
         }
 
         binding.btnTestRumble.setOnClickListener {
-            if (ControllerService.modeFlow.value == ControllerService.InjectionMode.NONE) {
+            if (ControllerService.serviceStateFlow.value.mode ==
+                ControllerService.InjectionMode.NONE
+            ) {
                 Toast.makeText(this, "Start the service first", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }

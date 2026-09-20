@@ -575,7 +575,8 @@ class BluetoothHidManager(private val context: Context) {
                 if (short == BATTERY_CHAR_SHORT) {
                     batteryChar = ch
                 }
-                if (canWrite && short in VALVE_WRITE_LOW..VALVE_WRITE_HIGH &&
+                if (canWrite &&
+                    short in VALVE_WRITE_LOW..VALVE_WRITE_HIGH &&
                     featureWriteChar == null
                 ) {
                     featureWriteChar = ch

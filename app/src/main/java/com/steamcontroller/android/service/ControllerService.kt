@@ -1,11 +1,9 @@
 package com.steamcontroller.android.service
 
 import android.app.*
-import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.hardware.usb.UsbDevice
-import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -19,7 +17,6 @@ import com.steamcontroller.android.input.ShizukuInputInjector
 import com.steamcontroller.android.parser.Buttons
 import com.steamcontroller.android.parser.SteamControllerState
 import com.steamcontroller.android.parser.SteamReportParser
-import com.steamcontroller.android.service.UsageStatsHelper
 import com.steamcontroller.android.uinput.UInputGamepad
 import com.steamcontroller.android.uinput.UInputNative
 import com.steamcontroller.android.usb.HidReportReader
@@ -88,34 +85,22 @@ class ControllerService : Service() {
         private val _rawReportFlow = MutableStateFlow<ByteArray?>(null)
         val rawReportFlow: StateFlow<ByteArray?> = _rawReportFlow.asStateFlow()
 
-        private val _modeFlow = MutableStateFlow(InjectionMode.NONE)
-        val modeFlow: StateFlow<InjectionMode> = _modeFlow.asStateFlow()
+        /** Everything the UI needs to know about the service, in one atomically-updated object. */
+        data class ServiceState(
+            val mode: InjectionMode = InjectionMode.NONE,
+            val link: LinkStatus = LinkStatus(LinkState.DISCONNECTED, "not started"),
+            val batteryPercent: Int? = null,
+            val profileId: Int? = null,
+            val backend: Int = UInputNative.Backend.NONE,
+            val backendDetail: String = "",
+            val rumbleSupported: Boolean = true
+        )
 
-        // Emits the active emulated profile id whenever it changes (start, cycle from notif, etc.)
-        private val _profileFlow = MutableStateFlow<Int?>(null)
-        val profileFlow: StateFlow<Int?> = _profileFlow.asStateFlow()
-
-        // Controller battery as 0..100, or null if unknown. Updated when a HID report carries it.
-        private val _batteryFlow = MutableStateFlow<Int?>(null)
-        val batteryFlow: StateFlow<Int?> = _batteryFlow.asStateFlow()
-
-        // Which output backend the shell-UID service selected, and what it saw while
-        // probing. Surfaced by the UI so a backend downgrade is never silent.
-        private val _backendIdFlow = MutableStateFlow(UInputNative.Backend.NONE)
-        val backendIdFlow: StateFlow<Int> = _backendIdFlow.asStateFlow()
-
-        private val _backendDetailFlow = MutableStateFlow("")
-        val backendDetailFlow: StateFlow<String> = _backendDetailFlow.asStateFlow()
-
-        // Whether games can rumble through the active backend. Defaults to true so the
-        // control stays usable until a backend is actually chosen.
-        private val _rumbleSupportedFlow = MutableStateFlow(true)
-        val rumbleSupportedFlow: StateFlow<Boolean> = _rumbleSupportedFlow.asStateFlow()
-
-        // What the UI should say about the link to the controller.
-        private val _linkStatusFlow =
-            MutableStateFlow(LinkStatus(LinkState.DISCONNECTED, "not started"))
-        val linkStatusFlow: StateFlow<LinkStatus> = _linkStatusFlow.asStateFlow()
+        // One flow rather than one per field: six independent flows could (and did) disagree
+        // with each other, e.g. a mode that had already switched while the backend detail was
+        // still describing the previous one. Consumers read a consistent snapshot instead.
+        private val _serviceStateFlow = MutableStateFlow(ServiceState())
+        val serviceStateFlow: StateFlow<ServiceState> = _serviceStateFlow.asStateFlow()
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -173,12 +158,13 @@ class ControllerService : Service() {
         uinput = UInputGamepad(this, Prefs.getProfile(this))
         uinput.onRumble = { strong, weak -> forwardRumble(strong, weak) }
         createNotificationChannel()
-        _profileFlow.value = Prefs.getProfile(this).id
+        _serviceStateFlow.value =
+            _serviceStateFlow.value.copy(profileId = Prefs.getProfile(this).id)
 
         // Refresh the foreground notification whenever the controller's battery level changes.
         // StateFlow only emits on actual value changes, so this triggers ~once per percent dropped.
         scope.launch {
-            _batteryFlow.collect { refreshNotification() }
+            _serviceStateFlow.collect { refreshNotification() }
         }
 
         startForegroundAppMonitor()
@@ -248,14 +234,14 @@ class ControllerService : Service() {
                         "link stalled — controller asleep, or hold B + R1 + Steam for a blue LED"
                     )
             }
-        if (_linkStatusFlow.value != status) {
+        if (_serviceStateFlow.value.link != status) {
             Log.i(
                 TAG,
                 "link status: ${status.state}" +
                     if (status.detail.isEmpty()) "" else " — ${status.detail}"
             )
         }
-        _linkStatusFlow.value = status
+        _serviceStateFlow.value = _serviceStateFlow.value.copy(link = status)
     }
 
     // ─── Foreground-app auto-switch (V1.2 Phase 2b) ────────────────────────────
@@ -337,14 +323,15 @@ class ControllerService : Service() {
                         com.steamcontroller.android.uinput.GamepadProfile
                             .fromId(bound.profileId)
                     uinput.switchProfile(gp)
-                    _profileFlow.value = bound.profileId
+                    _serviceStateFlow.value =
+                        _serviceStateFlow.value.copy(profileId = bound.profileId)
                     refreshNotification()
                 } finally {
                     profileSwitchInFlight = false
                 }
             }
         } else {
-            _profileFlow.value = bound.profileId
+            _serviceStateFlow.value = _serviceStateFlow.value.copy(profileId = bound.profileId)
             refreshNotification()
         }
     }
@@ -369,7 +356,7 @@ class ControllerService : Service() {
                 ).show()
         }
         // Notification refresh happens via refreshNotification() in the caller
-        // after _profileFlow.value is updated.
+        // after the service state's profileId is updated.
     }
 
     private var lastRumbleStrong = -1
@@ -600,7 +587,7 @@ class ControllerService : Service() {
         // Frames are the proof of life. Flip to LINKED immediately rather than waiting for the
         // ticker, so a reconnected controller goes green the moment it starts talking.
         lastFrameAt = android.os.SystemClock.uptimeMillis()
-        if (_linkStatusFlow.value.state != LinkState.LINKED) refreshLinkStatus()
+        if (_serviceStateFlow.value.link.state != LinkState.LINKED) refreshLinkStatus()
 
         // Diagnostic: the left trackpad click does not show up in the button field at all (the
         // mask is unchanged across left-pad clicks), so dump the whole state report whenever the
@@ -623,7 +610,10 @@ class ControllerService : Service() {
         // report were assumed to be a static battery field but turned out to be live,
         // fast-changing data (empirically: flickers 0%/99% on USB), so that guess isn't used.
         SteamReportParser.parseBatteryStatus(raw)?.let { status ->
-            if (_batteryFlow.value != status.percent) _batteryFlow.value = status.percent
+            if (_serviceStateFlow.value.batteryPercent != status.percent) {
+                _serviceStateFlow.value =
+                    _serviceStateFlow.value.copy(batteryPercent = status.percent)
+            }
         }
 
         if (raw.isNotEmpty() && (raw[0].toInt() and 0xFF) == 0x45) {
@@ -643,8 +633,11 @@ class ControllerService : Service() {
             }
             // Published before setMode() so the UI label can read both when the mode
             // change reaches it — see MainActivity.refreshModeLabel().
-            _backendIdFlow.value = uinput.backendId
-            _backendDetailFlow.value = uinput.backendDetail
+            _serviceStateFlow.value =
+                _serviceStateFlow.value.copy(
+                    backend = uinput.backendId,
+                    backendDetail = uinput.backendDetail
+                )
             if (uinput.isReady) {
                 setMode(
                     if (uinput.backendId == UInputNative.Backend.UHID) {
@@ -668,7 +661,10 @@ class ControllerService : Service() {
             )
             uinput.unbind()
         } catch (t: Throwable) {
-            _backendDetailFlow.value = "virtual output error: ${t.message}"
+            _serviceStateFlow.value =
+                _serviceStateFlow.value.copy(
+                    backendDetail = "virtual output error: ${t.message}"
+                )
             Log.w(TAG, "virtual output bind failed: ${t.message}, falling back to inject")
         }
 
@@ -684,10 +680,19 @@ class ControllerService : Service() {
 
     private fun setMode(newMode: InjectionMode) {
         mode = newMode
-        _modeFlow.value = newMode
+        _serviceStateFlow.value =
+            _serviceStateFlow.value.copy(
+                mode = newMode,
+                rumbleSupported = newMode.isVirtualDevice && uinput.rumbleSupported
+            )
         // Rumble travels over force feedback from the virtual device, which only the uinput
         // backend implements — and only while that device is actually alive.
-        _rumbleSupportedFlow.value = newMode.isVirtualDevice && uinput.rumbleSupported
+        _serviceStateFlow.value =
+            _serviceStateFlow.value.copy(
+                mode = newMode,
+                rumbleSupported = newMode.isVirtualDevice && uinput.rumbleSupported
+            )
+        refreshNotification()
         refreshNotification()
     }
 
@@ -740,7 +745,7 @@ class ControllerService : Service() {
                         )
                     }
                 }
-                _profileFlow.value = next.id
+                _serviceStateFlow.value = _serviceStateFlow.value.copy(profileId = next.id)
                 refreshNotification()
             } finally {
                 profileSwitchInFlight = false
@@ -828,13 +833,20 @@ class ControllerService : Service() {
             btManager.disconnect()
         } catch (_: Throwable) {
         }
-        _modeFlow.value = InjectionMode.NONE
+        _serviceStateFlow.value =
+            _serviceStateFlow.value.copy(
+                mode = InjectionMode.NONE,
+                link = LinkStatus(LinkState.DISCONNECTED, "service stopped"),
+                batteryPercent = null,
+                profileId = null
+            )
         initializing = false
         initializedTransport = null
         // Reset state + battery so MainActivity's "is the controller actually here?"
         // observer flips back to disconnected on stop.
         _stateFlow.value = null
-        _batteryFlow.value = null
+        _serviceStateFlow.value =
+            _serviceStateFlow.value.copy(batteryPercent = null)
         super.onDestroy()
     }
 
@@ -857,7 +869,7 @@ class ControllerService : Service() {
 
     private fun buildNotification(): Notification {
         val profile = Prefs.getProfile(this)
-        val battery = _batteryFlow.value
+        val battery = _serviceStateFlow.value.batteryPercent
 
         val modeText =
             when (mode) {
