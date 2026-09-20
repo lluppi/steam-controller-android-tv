@@ -2,7 +2,12 @@ package com.steamcontroller.android.bt
 
 import android.annotation.SuppressLint
 import android.bluetooth.*
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -23,10 +28,10 @@ class BluetoothHidManager(private val context: Context) {
         private const val TAG = "BluetoothHidManager"
 
         val VALVE_SERVICE_UUID: UUID = UUID.fromString("100f6c32-1735-4313-b402-38567131e5f3")
-        private const val VALVE_NOTIFY_LOW: Long  = 0x100f6c75L
+        private const val VALVE_NOTIFY_LOW: Long = 0x100f6c75L
         private const val VALVE_NOTIFY_HIGH: Long = 0x100f6c7aL
-        private const val VALVE_WRITE_LOW: Long   = 0x100f6cb5L
-        private const val VALVE_WRITE_HIGH: Long  = 0x100f6cbeL
+        private const val VALVE_WRITE_LOW: Long = 0x100f6cb5L
+        private const val VALVE_WRITE_HIGH: Long = 0x100f6cbeL
         private const val BATTERY_CHAR_SHORT: Long = 0x100f6c78L
 
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
@@ -35,6 +40,9 @@ class BluetoothHidManager(private val context: Context) {
 
         private val DISABLE_LIZARD = byteArrayOf(0x85.toByte())
         private const val DESIRED_MTU = 100
+
+        /** How long any single handshake step may go without its callback. */
+        private const val HANDSHAKE_TIMEOUT_MS = 5000L
     }
 
     private enum class State { IDLE, CONNECTING, MTU_REQUESTED, DISCOVERING, SUBSCRIBING, READY }
@@ -55,6 +63,20 @@ class BluetoothHidManager(private val context: Context) {
 
     private var onReport: ((ByteArray) -> Unit)? = null
     private var onConnectionChange: ((Boolean) -> Unit)? = null
+
+    // ── Auto-reconnect ─────────────────────────────────────────────────────────
+    // The controller powers itself off when idle, which tears the GATT down. Retrying only
+    // on a user tap left the app sitting on a dead link reporting "disconnected" until it was
+    // restarted — and a controller that is bonded but unreachable looks identical to a broken
+    // one. So: retry forever with backoff while the service runs, and jump the queue when the
+    // ACL comes up (i.e. the controller just woke).
+    private var reconnectEnabled = false
+    private var reconnectScheduled = false
+    private var reconnectAttempts = 0
+    private var targetDevice: BluetoothDevice? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private val reconnectRunnable = Runnable { attemptReconnect("backoff") }
+    private var aclReceiver: BroadcastReceiver? = null
 
     val isBluetoothAvailable: Boolean get() = adapter != null && adapter.isEnabled
 
@@ -78,12 +100,130 @@ class BluetoothHidManager(private val context: Context) {
     ) {
         this.onReport = onReport
         this.onConnectionChange = onConnectionChange
+        targetDevice = device
+        reconnectEnabled = true
+        reconnectAttempts = 0
+        registerAclReceiver(device)
         Log.i(TAG, "Connecting GATT to ${safeName(device)} (${device.address})")
         state = State.CONNECTING
+        // A previous client's claim may still be registered with the stack (e.g. the app was
+        // killed mid-session), which makes the new connect fail with 133. Release it first.
+        closeGatt()
         gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+        armWatchdog("connect")
+    }
+
+    /** Backoff: 1s, 2s, 4s, 8s, 16s, then every 30s. */
+    private fun reconnectDelayMs(): Long =
+        (1000L shl reconnectAttempts.coerceAtMost(5)).coerceAtMost(30_000L)
+
+    private fun scheduleReconnect(reason: String) {
+        if (!reconnectEnabled || reconnectScheduled) return
+        val delayMs = reconnectDelayMs()
+        reconnectScheduled = true
+        Log.i(TAG, "Will retry GATT in ${delayMs}ms ($reason), attempt ${reconnectAttempts + 1}")
+        handler.postDelayed(reconnectRunnable, delayMs)
+    }
+
+    private fun attemptReconnect(reason: String) {
+        reconnectScheduled = false
+        if (!reconnectEnabled) return
+        val device = targetDevice ?: return
+        reconnectAttempts++
+        Log.i(TAG, "Reconnect attempt $reconnectAttempts ($reason) → ${safeName(device)}")
+        state = State.CONNECTING
+        closeGatt()
+        gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+        armWatchdog("reconnect")
+    }
+
+    /** Close the current client without touching the retry loop. */
+    private fun closeGatt() {
+        try {
+            gatt?.disconnect()
+        } catch (_: Throwable) {}
+        try {
+            gatt?.close()
+        } catch (_: Throwable) {}
+        gatt = null
+    }
+
+    private fun registerAclReceiver(device: BluetoothDevice) {
+        if (aclReceiver != null) return
+        val receiver =
+            object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context?, intent: Intent?) {
+                    val changed = intent?.getParcelableExtra<BluetoothDevice>(
+                        BluetoothDevice.EXTRA_DEVICE
+                    )
+                    if (changed?.address != device.address) return
+                    if (intent.action == BluetoothDevice.ACTION_ACL_CONNECTED) {
+                        // The controller is back — don't wait out the backoff.
+                        Log.i(TAG, "ACL connected — retrying GATT immediately")
+                        handler.removeCallbacks(reconnectRunnable)
+                        reconnectScheduled = false
+                        if (state != State.READY && state != State.CONNECTING) {
+                            attemptReconnect("acl-connected")
+                        }
+                    } else {
+                        Log.i(TAG, "ACL disconnected")
+                    }
+                }
+            }
+        val filter =
+            IntentFilter().apply {
+                addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+                addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+            }
+        context.registerReceiver(receiver, filter)
+        aclReceiver = receiver
+    }
+
+    private fun unregisterAclReceiver() {
+        aclReceiver?.let {
+            try {
+                context.unregisterReceiver(it)
+            } catch (_: Throwable) {}
+        }
+        aclReceiver = null
+    }
+
+    /**
+     * Handshake watchdog.
+     *
+     * Every step of the connect handshake waits for its own callback before starting the next
+     * one, and the vendor service does not always deliver one — a descriptor write that never
+     * completes left the app connected but permanently deaf (OS reports the device bonded,
+     * battery stays "—", nothing responds) until the service was restarted. Time the step out
+     * and hand over to the reconnect loop instead of waiting forever.
+     */
+    private val handshakeWatchdog =
+        Runnable {
+            if (state == State.IDLE || state == State.READY) return@Runnable
+            Log.w(TAG, "Handshake stalled in $state for ${HANDSHAKE_TIMEOUT_MS}ms — retrying")
+            reconnectAttempts++
+            state = State.IDLE
+            closeGatt()
+            scheduleReconnect("handshake timeout")
+        }
+
+    private fun armWatchdog(step: String) {
+        handler.removeCallbacks(handshakeWatchdog)
+        Log.v(TAG, "Handshake step: $step")
+        handler.postDelayed(handshakeWatchdog, HANDSHAKE_TIMEOUT_MS)
+    }
+
+    private fun clearWatchdog() {
+        handler.removeCallbacks(handshakeWatchdog)
     }
 
     fun disconnect() {
+        // Explicit teardown: stop retrying, or the loop resurrects the link the caller just cut.
+        reconnectEnabled = false
+        reconnectScheduled = false
+        handler.removeCallbacks(reconnectRunnable)
+        clearWatchdog()
+        unregisterAclReceiver()
         try {
             gatt?.disconnect()
             gatt?.close()
@@ -176,7 +316,7 @@ class BluetoothHidManager(private val context: Context) {
         // from 88% to 97% (near-continuous drive at full magnitude — 0x8F's on/off pulse
         // model may just have a firmness ceiling below what a "big motor spins" rumble
         // feels like; 97% duty is close to that ceiling for this command).
-        val totalPeriodUs = 6250  // ~160Hz
+        val totalPeriodUs = 6250 // ~160Hz
         val minDutyPct = 25
         val maxDutyPct = 97
         val dutyPct = minDutyPct + (mag * (maxDutyPct - minDutyPct) / 0xFFFF)
@@ -189,11 +329,14 @@ class BluetoothHidManager(private val context: Context) {
         // now cycles continuously between sends instead of firing one brief blip.
         val repeat = 0xFFFF
         return byteArrayOf(
-            0x8F.toByte(),                       // command id (HAPTIC_PULSE)
+            0x8F.toByte(), // command id (HAPTIC_PULSE)
             padId.toByte(),
-            (highPeriod and 0xFF).toByte(), (highPeriod shr 8 and 0xFF).toByte(),
-            (lowPeriod and 0xFF).toByte(),  (lowPeriod shr 8 and 0xFF).toByte(),
-            (repeat and 0xFF).toByte(),     (repeat shr 8 and 0xFF).toByte(),
+            (highPeriod and 0xFF).toByte(),
+            (highPeriod shr 8 and 0xFF).toByte(),
+            (lowPeriod and 0xFF).toByte(),
+            (lowPeriod shr 8 and 0xFF).toByte(),
+            (repeat and 0xFF).toByte(),
+            (repeat shr 8 and 0xFF).toByte()
         )
     }
 
@@ -201,7 +344,7 @@ class BluetoothHidManager(private val context: Context) {
         if (state != State.READY) return
         val g = gatt ?: return
         val ch = featureWriteChar ?: return
-        if (!heartbeatBusy.compareAndSet(false, true)) return  // previous heartbeat not yet acked
+        if (!heartbeatBusy.compareAndSet(false, true)) return // previous heartbeat not yet acked
         try {
             ch.value = DISABLE_LIZARD
             ch.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
@@ -230,22 +373,31 @@ class BluetoothHidManager(private val context: Context) {
 
                     if (state == State.CONNECTING) {
                         state = State.MTU_REQUESTED
+                        armWatchdog("request-mtu")
                         val ok = g.requestMtu(DESIRED_MTU)
                         if (!ok) {
-                            Log.w(TAG, "requestMtu($DESIRED_MTU) returned false, skipping to discover")
+                            Log.w(
+                                TAG,
+                                "requestMtu($DESIRED_MTU) returned false, skipping to discover"
+                            )
                             state = State.DISCOVERING
                             g.discoverServices()
                         }
                     }
                 }
+
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     onConnectionChange?.invoke(false)
-                    try { g.close() } catch (_: Throwable) {}
+                    try {
+                        g.close()
+                    } catch (_: Throwable) {}
                     gatt = null
                     featureWriteChar = null
                     pendingSubs.clear()
                     subsIndex = 0
                     state = State.IDLE
+                    clearWatchdog()
+                    scheduleReconnect("disconnected status=$status")
                 }
             }
         }
@@ -257,6 +409,7 @@ class BluetoothHidManager(private val context: Context) {
             state = State.DISCOVERING
             val ok = g.discoverServices()
             Log.i(TAG, "discoverServices → $ok")
+            armWatchdog("discover-services")
         }
 
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
@@ -287,9 +440,12 @@ class BluetoothHidManager(private val context: Context) {
             for (ch in valve.characteristics) {
                 val short = shortUuid(ch.uuid) ?: continue
                 val canNotify = (ch.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0
-                val canWrite = (ch.properties and (
+                val canWrite = (
+                    ch.properties and (
                         BluetoothGattCharacteristic.PROPERTY_WRITE or
-                        BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)) != 0
+                            BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE
+                        )
+                    ) != 0
 
                 if (canNotify && short in VALVE_NOTIFY_LOW..VALVE_NOTIFY_HIGH) {
                     pendingSubs.add(ch)
@@ -297,11 +453,16 @@ class BluetoothHidManager(private val context: Context) {
                 if (short == BATTERY_CHAR_SHORT) {
                     batteryChar = ch
                 }
-                if (canWrite && short in VALVE_WRITE_LOW..VALVE_WRITE_HIGH && featureWriteChar == null) {
+                if (canWrite && short in VALVE_WRITE_LOW..VALVE_WRITE_HIGH &&
+                    featureWriteChar == null
+                ) {
                     featureWriteChar = ch
                 }
             }
-            Log.i(TAG, "Found ${pendingSubs.size} notify chars; feature-write=${featureWriteChar?.uuid}")
+            Log.i(
+                TAG,
+                "Found ${pendingSubs.size} notify chars; feature-write=${featureWriteChar?.uuid}"
+            )
 
             subsIndex = 0
             state = State.SUBSCRIBING
@@ -313,7 +474,10 @@ class BluetoothHidManager(private val context: Context) {
             descriptor: BluetoothGattDescriptor,
             status: Int
         ) {
-            Log.v(TAG, "onDescriptorWrite ${descriptor.uuid} status=$status (state=$state, idx=$subsIndex/${pendingSubs.size})")
+            Log.v(
+                TAG,
+                "onDescriptorWrite ${descriptor.uuid} status=$status (state=$state, idx=$subsIndex/${pendingSubs.size})"
+            )
             if (state == State.SUBSCRIBING) subscribeNext(g)
         }
 
@@ -324,6 +488,8 @@ class BluetoothHidManager(private val context: Context) {
         ) {
             heartbeatBusy.set(false)
             if (status != 0) Log.w(TAG, "Write ${ch.uuid} failed: status=$status")
+            // The disable-lizard write is the last handshake step.
+            if (state == State.READY) clearWatchdog()
             // GATT ops are serialized (only one in flight) — chain the seed battery read
             // right after the disable-lizard write that follows subscription setup finishes.
             if (pendingBatteryRead) {
@@ -344,6 +510,7 @@ class BluetoothHidManager(private val context: Context) {
                 Log.w(TAG, "Battery seed read failed: status=$status")
                 return
             }
+            clearWatchdog()
             val data = ch.value ?: return
             if (shortUuid(ch.uuid) == BATTERY_CHAR_SHORT && data.size == 14) {
                 onReport?.invoke(byteArrayOf(0x43.toByte(), data[1], 0x00))
@@ -351,10 +518,7 @@ class BluetoothHidManager(private val context: Context) {
         }
 
         private var reportCounter = 0
-        override fun onCharacteristicChanged(
-            g: BluetoothGatt,
-            ch: BluetoothGattCharacteristic
-        ) {
+        override fun onCharacteristicChanged(g: BluetoothGatt, ch: BluetoothGattCharacteristic) {
             val data = ch.value ?: return
             reportCounter++
             val short = shortUuid(ch.uuid)
@@ -377,10 +541,19 @@ class BluetoothHidManager(private val context: Context) {
                     System.arraycopy(data, 0, withId, 1, data.size)
                     withId
                 }
-                short == BATTERY_CHAR_SHORT && data.size == 14 -> byteArrayOf(0x43.toByte(), data[1], 0x00)
+
+                short == BATTERY_CHAR_SHORT && data.size == 14 -> byteArrayOf(
+                    0x43.toByte(),
+                    data[1],
+                    0x00
+                )
+
                 else -> {
-                    Log.v(TAG, "Unrecognized short report (${data.size}B) from ${ch.uuid}: " +
-                        data.joinToString(" ") { "%02x".format(it) })
+                    Log.v(
+                        TAG,
+                        "Unrecognized short report (${data.size}B) from ${ch.uuid}: " +
+                            data.joinToString(" ") { "%02x".format(it) }
+                    )
                     data
                 }
             }
@@ -393,11 +566,15 @@ class BluetoothHidManager(private val context: Context) {
     }
 
     private fun subscribeNext(g: BluetoothGatt) {
+        // Covers each subscription step and the disable-lizard write that follows the last one.
+        armWatchdog("subscribe idx=$subsIndex/${pendingSubs.size}")
         if (subsIndex >= pendingSubs.size) {
             // All subscriptions done — send disable lizard mode
             Log.i(TAG, "All ${pendingSubs.size} subscriptions complete, sending disable lizard")
             val ch = featureWriteChar
             state = State.READY
+            // Healthy again — the next outage starts its backoff from 1s.
+            reconnectAttempts = 0
             if (ch == null) {
                 Log.w(TAG, "No feature write char; skipping disable lizard")
                 // Notify-only battery char never pushes until its value changes on the
@@ -424,7 +601,7 @@ class BluetoothHidManager(private val context: Context) {
         }
         cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
         val wOk = g.writeDescriptor(cccd)
-        Log.v(TAG, "Subscribe ${ch.uuid} idx=${subsIndex-1} setNotify=$nOk writeDesc=$wOk")
+        Log.v(TAG, "Subscribe ${ch.uuid} idx=${subsIndex - 1} setNotify=$nOk writeDesc=$wOk")
         if (!wOk) {
             // Move on; we'll lose this one but try the rest
             subscribeNext(g)
@@ -434,19 +611,26 @@ class BluetoothHidManager(private val context: Context) {
     private fun shortUuid(uuid: UUID): Long? {
         val s = uuid.toString()
         if (!s.endsWith("-1735-4313-b402-38567131e5f3")) return null
-        return try { java.lang.Long.parseLong(s.substring(0, 8), 16) } catch (_: Throwable) { null }
+        return try {
+            java.lang.Long.parseLong(s.substring(0, 8), 16)
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     private fun describeProps(p: Int): String {
         val parts = mutableListOf<String>()
-        if (p and BluetoothGattCharacteristic.PROPERTY_READ != 0)              parts += "READ"
-        if (p and BluetoothGattCharacteristic.PROPERTY_WRITE != 0)             parts += "WRITE"
+        if (p and BluetoothGattCharacteristic.PROPERTY_READ != 0) parts += "READ"
+        if (p and BluetoothGattCharacteristic.PROPERTY_WRITE != 0) parts += "WRITE"
         if (p and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0) parts += "WRITE_NR"
-        if (p and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0)            parts += "NOTIFY"
-        if (p and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0)          parts += "INDICATE"
+        if (p and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0) parts += "NOTIFY"
+        if (p and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0) parts += "INDICATE"
         return parts.joinToString("|").ifEmpty { "—" }
     }
 
-    private fun safeName(device: BluetoothDevice): String =
-        try { device.name ?: "?" } catch (_: SecurityException) { "?" }
+    private fun safeName(device: BluetoothDevice): String = try {
+        device.name ?: "?"
+    } catch (_: SecurityException) {
+        "?"
+    }
 }
