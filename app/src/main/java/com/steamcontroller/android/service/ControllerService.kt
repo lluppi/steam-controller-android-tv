@@ -94,6 +94,12 @@ class ControllerService : Service() {
     private val legacyInjector = ShizukuInputInjector()
     private lateinit var uinput: UInputGamepad
     private var mode: InjectionMode = InjectionMode.NONE
+
+    // Guards against a duplicate start re-initializing on top of a live connection: a second GATT
+    // client against a controller that accepts one makes the handshake stall at the first
+    // subscription, which presents as "the controller went unresponsive".
+    private var initializing = false
+    private var initializedTransport: Transport? = null
     private var reader: HidReportReader? = null
     private var heartbeatJob: Job? = null
 
@@ -344,6 +350,21 @@ class ControllerService : Service() {
                 intent?.getParcelableExtra(EXTRA_DEVICE)
             }
 
+        // A duplicate start must be a no-op — see the fields above. A start for a *different*
+        // transport is a deliberate restart (the UI tells the user to restart to apply a transport
+        // change), so that one is allowed through.
+        val requestedTransport = Prefs.getTransport(this)
+        if (initializing ||
+            (mode != InjectionMode.NONE && initializedTransport == requestedTransport)
+        ) {
+            Log.i(
+                TAG,
+                "Ignoring duplicate start (initializing=$initializing, mode=$mode, " +
+                    "transport=$requestedTransport)"
+            )
+            return START_STICKY
+        }
+
         scope.launch { initialize(device) }
         return START_STICKY
     }
@@ -360,9 +381,13 @@ class ControllerService : Service() {
             }
         if (!ok) {
             Log.e(TAG, "Transport init failed, stopping service")
+            initializing = false
+            initializedTransport = null
             stopSelf()
             return
         }
+        initializing = false
+        initializedTransport = transport
         Log.i(TAG, "Controller service running, injection mode = $mode")
     }
 
@@ -663,6 +688,8 @@ class ControllerService : Service() {
         } catch (_: Throwable) {
         }
         _modeFlow.value = InjectionMode.NONE
+        initializing = false
+        initializedTransport = null
         // Reset state + battery so MainActivity's "is the controller actually here?"
         // observer flips back to disconnected on stop.
         _stateFlow.value = null

@@ -47,8 +47,8 @@ class BluetoothHidManager(private val context: Context) {
         /** Consecutive stalled handshakes before the bond is recreated as a last resort. */
         private const val REBOND_AFTER_STALLS = 4
 
-        /** Never recreate the bond twice inside this window. */
-        private const val REBOND_COOLDOWN_MS = 120_000L
+        /** Rate-limit for the "link is not recovering" diagnostic. */
+        private const val LINK_TROUBLE_COOLDOWN_MS = 120_000L
     }
 
     private enum class State { IDLE, CONNECTING, MTU_REQUESTED, DISCOVERING, SUBSCRIBING, READY }
@@ -263,49 +263,33 @@ class BluetoothHidManager(private val context: Context) {
      * change that follows is handled by resolveTarget(). Escalation is capped by a cooldown so a
      * persistently failing link cannot loop on it.
      */
+
+    /**
+     * Reports a handshake that keeps failing.
+     *
+     * This deliberately does NOT recreate the bond any more. An earlier version did, and it unpaired
+     * a controller that had merely gone to sleep — a sleeping controller and a wedged one are
+     * indistinguishable at the link layer (both connect, then stop answering GATT). The wedge itself
+     * also turned out to be caused by this app re-initializing on top of a live connection, which is
+     * now prevented. So: report it, throttle the noise, and leave the pairing alone.
+     */
     private fun escalateRebond(reason: String) {
-        val device = targetDevice ?: return
         if (!hadReadySession) {
             Log.w(
                 TAG,
-                "Not escalating ($reason): no handshake has ever completed with this pairing, " +
-                    "so this is an absent or sleeping controller rather than a wedged link"
+                "Link not recovering ($reason) — no handshake has completed with this pairing, " +
+                    "so the controller is off, asleep or out of range"
             )
             return
         }
         val now = android.os.SystemClock.elapsedRealtime()
-        if (now - lastRebondAt < REBOND_COOLDOWN_MS) {
-            Log.w(TAG, "Link still wedged ($reason), but a re-bond was attempted recently")
-            return
-        }
+        if (now - lastRebondAt < LINK_TROUBLE_COOLDOWN_MS) return
         lastRebondAt = now
-        Log.w(TAG, "Link wedged ($reason) — removing and re-creating the bond")
-        val removed = removeBond(device)
-        Log.w(TAG, "removeBond → $removed")
-        if (!removed) return
-        consecutiveStalls = 0
-        // Give the stack a moment to tear the bond down, then pair again. A fresh address follows,
-        // and resolveTarget() picks it up on the next attempt.
-        handler.postDelayed(
-            {
-                val ok =
-                    try {
-                        device.createBond()
-                    } catch (t: Throwable) {
-                        Log.w(TAG, "createBond failed: ${t.message}")
-                        false
-                    }
-                Log.i(TAG, "createBond → $ok")
-            },
-            2500L
+        Log.w(
+            TAG,
+            "Link has not recovered after a working session ($reason). Leaving the pairing " +
+                "alone — if this persists, remove and re-pair the controller once."
         )
-    }
-
-    private fun removeBond(device: BluetoothDevice): Boolean = try {
-        (device.javaClass.getMethod("removeBond").invoke(device) as? Boolean) ?: false
-    } catch (t: Throwable) {
-        Log.w(TAG, "removeBond() unavailable: ${t.message}")
-        false
     }
 
     /**
