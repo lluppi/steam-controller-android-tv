@@ -139,8 +139,11 @@ Nothing in Phases 2+ starts until P1.S3 passes.
 - Find the node: `adb shell getevent -pl` (look for the spike name).
 - Expect `KEY: BTN_A BTN_B BTN_X BTN_Y BTN_TL BTN_TR BTN_TL2 BTN_TR2 BTN_SELECT BTN_START
   BTN_MODE BTN_THUMBL BTN_THUMBR`, `ABS: ABS_X ABS_Y ABS_RX ABS_RY ABS_Z ABS_RZ
-  ABS_HAT0X ABS_HAT0Y`. If `BTN_C`/`BTN_Z` appear, the descriptor's button numbering
-  drifted — fix before continuing.
+  ABS_HAT0X ABS_HAT0Y`. `BTN_C`/`BTN_Z` (0x132/0x135) appearing in the KEY list is
+  **expected**: `hid-input` maps gamepad button N to `BTN_GAMEPAD + N - 1`, so 15 declared
+  buttons give the contiguous range 0x130-0x13e and the packer simply never sets the
+  indexes that land on them (confirmed on device — see `docs/evidence/P1-S3.md`). What
+  matters is which codes are *emitted*, not which are declared.
 - `adb shell dumpsys input | grep -A25 'spike'` → check `Sources`, `KeyboardType`, and
   which `.kl` was picked (`KeyLayoutFile`). With VID/PID `045e:028e` Android should pick
   `Vendor_045e_Product_028e.kl`; with an unknown pair, `Generic.kl`. Record both.
@@ -558,15 +561,33 @@ C0  C0
   `android/log.h` / `jni.h` not found — a bare-host-clang artifact, not a code error.
   Regenerate via any native build: `app/.cxx/Debug/*/arm64-v8a/compile_commands.json`.
 
-### Not done — and why
+### P1 spike — **GO** (see `docs/evidence/P1-S3.md`)
 
-- **P1 (the spike) is still the gate and has not run.** Nothing here is device-verified:
-  the uhid backend compiles, is wired, and its descriptors and report packing are
-  written against the kernel's documented behaviour — but **not one report has ever been
-  written to `/dev/uhid`**. Until P1.S3 passes, treat P2/P3 as unproven on hardware.
-- **P0.S3 is blocked on a human.** `adb connect $SHIELD` returns `unauthorized`: the
-  device needs the key prompt accepted on screen, and only the TV remote can dismiss it.
-  Nothing on the device has been touched yet.
+The gate passed on 2026-09-20. On the Shield, `/dev/uhid` produced both devices with the
+right Android source classes, no root, no SELinux denial, no kernel oops and no reboot:
+
+- gamepad → `sources=0x01000511` = SOURCE_GAMEPAD | SOURCE_KEYBOARD | SOURCE_JOYSTICK,
+  and Android picked the real Xbox 360 keylayout (`Vendor_045e_Product_028e.kl`) from the
+  advertised VID/PID
+- mouse → `sources=0x00002002` = SOURCE_MOUSE | SOURCE_CLASS_POINTER — the system-wide
+  cursor that inject mode cannot provide
+- capabilities from `getevent -p` are an exact match for the uinput backend's axis and
+  button declarations
+
+The Shield's own remote is itself a uhid device on this build, which is independent
+pre-existing evidence that the mechanism works here. Bonus: `/system/bin/hid` exists (the
+spike needed no compilation) and `/sys/bus/hid/drivers/sony` is present, so P6 stays viable.
+
+### Still not verified
+
+- **Event-level flow.** Device creation and classification are proven; a capture of the
+  *emitted* events (a press producing the matching `BTN_*`) was not obtained, because the
+  adb link drops whenever the `hid` tool runs for more than a few seconds (see the
+  evidence file — not a crash, uptime advances monotonically and there are no oops).
+  Report packing is therefore still unproven in motion.
+- **The cursor visually moving** — needs a human watching the TV.
+- **The app itself has not run on the device.** P3.S6 (install, connect, play) is the real
+  acceptance test; do that before trusting the backend end-to-end.
 
 ### Known wart
 
