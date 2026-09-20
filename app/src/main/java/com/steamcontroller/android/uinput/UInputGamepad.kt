@@ -464,6 +464,18 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         }
         if (relX == 0 && relY == 0 && scrollTicks == 0 && keys == lastSentKeys) return
         lastSentKeys = keys
+        // Diagnostic: log exactly what is transmitted, so "the left pad emits a click" stops being
+        // an inference from the button mask. If this prints on a left-pad click then the app did
+        // its part and the failure is downstream; if it stays silent, the click bit never arrived.
+        if (keys != 0) {
+            Log.i(
+                TAG,
+                "sidecar CLICK: keys=0x${keys.toString(16)} " +
+                    "leftPadBit=${state.isButtonPressed(MOUSE_LEFT_PAD_CLICK_BIT)} " +
+                    "rightPadBit=${state.isButtonPressed(MOUSE_RIGHT_PAD_CLICK_BIT)} " +
+                    "mask=0x${state.buttons.toString(16)}"
+            )
+        }
         try {
             svc.sendMouseFrame(relX, relY, scrollTicks, keys)
         } catch (t: Throwable) {
