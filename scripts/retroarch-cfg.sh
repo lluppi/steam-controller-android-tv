@@ -25,35 +25,41 @@ ADB=(adb)
 # autoconfigs are read from. Note the default dir lives inside the app's private data, so the
 # shell UID cannot write it.
 show() {
-  "${ADB[@]}" shell "grep -nE 'config_save_on_exit|joypad_autoconfig_dir|input_joypad_driver' $CFG"
+	"${ADB[@]}" shell "grep -nE 'config_save_on_exit|joypad_autoconfig_dir|input_joypad_driver' $CFG"
 }
 
 guard() {
-  echo "--- stopping RetroArch (otherwise it rewrites the config on exit)"
-  "${ADB[@]}" shell "am force-stop $PKG"
-  sleep 2
-  echo "--- disabling config_save_on_exit"
-  "${ADB[@]}" shell "sed -i 's/^config_save_on_exit = .*/config_save_on_exit = \"false\"/' $CFG"
-  show
+	echo "--- stopping RetroArch (otherwise it rewrites the config on exit)"
+	"${ADB[@]}" shell "am force-stop $PKG"
+	sleep 2
+	echo "--- disabling config_save_on_exit"
+	"${ADB[@]}" shell "sed -i 's/^config_save_on_exit = .*/config_save_on_exit = \"false\"/' $CFG"
+	show
 }
 
 pull() {
-  guard
-  "${ADB[@]}" pull "$CFG" ./retroarch.cfg
-  echo "wrote ./retroarch.cfg"
+	guard
+	"${ADB[@]}" pull "$CFG" ./retroarch.cfg
+	echo "wrote ./retroarch.cfg"
 }
 
 push() {
-  [ -f ./retroarch.cfg ] || { echo "no ./retroarch.cfg to push — run '$0 pull' first" >&2; exit 1; }
-  guard
-  "${ADB[@]}" push ./retroarch.cfg "$CFG"
-  show
+	[ -f ./retroarch.cfg ] || {
+		echo "no ./retroarch.cfg to push — run '$0 pull' first" >&2
+		exit 1
+	}
+	guard
+	"${ADB[@]}" push ./retroarch.cfg "$CFG"
+	show
 }
 
 case "${1:-}" in
-  pull) pull ;;
-  push) push ;;
-  guard) guard ;;
-  show) show ;;
-  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ; exit 1 ;;
+pull) pull ;;
+push) push ;;
+guard) guard ;;
+show) show ;;
+*)
+	sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+	exit 1
+	;;
 esac

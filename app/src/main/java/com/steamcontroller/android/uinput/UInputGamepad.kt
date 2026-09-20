@@ -157,7 +157,26 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
             override fun onServiceDisconnected(name: ComponentName?) {
                 service = null
                 deviceReady = false
-                Log.w(TAG, "UInputService disconnected")
+                // Critical: without this, bind() short-circuits on `if (bound) return` forever and the
+                // app can never re-establish its user service — a killed service used to leave it
+                // permanently unable to create devices, with no way back except restarting the app.
+                bound = false
+                Log.w(TAG, "UInputService disconnected — will re-bind on the next start")
+            }
+
+            // API 26+: the binding died, or connected to nothing. Same recovery as above.
+            override fun onBindingDied(name: ComponentName?) {
+                service = null
+                deviceReady = false
+                bound = false
+                Log.w(TAG, "UInputService binding died — will re-bind on the next start")
+            }
+
+            override fun onNullBinding(name: ComponentName?) {
+                service = null
+                deviceReady = false
+                bound = false
+                Log.w(TAG, "UInputService returned a null binding")
             }
         }
 

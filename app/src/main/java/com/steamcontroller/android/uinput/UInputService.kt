@@ -2,6 +2,7 @@ package com.steamcontroller.android.uinput
 
 import android.content.Context
 import android.util.Log
+import java.util.concurrent.atomic.AtomicLong
 
 // Bound by Shizuku.bindUserService() — this code runs in a separate process with the
 // shell UID (2000), which is what gives access to the virtual-output device nodes.
@@ -11,6 +12,15 @@ import android.util.Log
 class UInputService : IUInputService.Stub {
     companion object {
         private const val TAG = "UInputService"
+
+        /** How often the liveness watchdog checks for client silence. */
+        private const val WATCHDOG_TICK_MS = 5_000L
+
+        /**
+         * Silence longer than this means the app that owns us is gone. Generous on purpose: the
+         * app polls at 50 Hz while its service runs, so this only trips on a killed client.
+         */
+        private const val CLIENT_IDLE_TIMEOUT_MS = 60_000L
     }
 
     @Suppress("unused")
@@ -21,6 +31,55 @@ class UInputService : IUInputService.Stub {
     @Suppress("unused")
     constructor(context: Context?) : super() {
         Log.i(TAG, "UInputService instantiated (Context=$context)")
+    }
+
+    // ── Client liveness watchdog ───────────────────────────────────────────────
+    //
+    // This process runs as the shell uid and holds the uhid devices. If the app is killed
+    // abruptly (an adb install does exactly this) nothing calls destroy(), so the process would
+    // survive as an orphan with its devices still registered — which is how duplicate gamepads
+    // accumulate and how RetroArch ends up bound to a pad whose owner no longer exists.
+    //
+    // The app polls us continuously while it is alive (the rumble poll runs at 50 Hz), so silence
+    // for a while means the client is gone and we should exit. The app recovers: it notices the
+    // binder death and re-binds on the next start.
+    private val lastCallAt = AtomicLong(System.currentTimeMillis())
+
+    // Starts after lastCallAt is initialised (property and init order is declaration order), and
+    // covers both constructors: Shizuku may use either.
+    init {
+        startLivenessWatchdog()
+    }
+
+    private fun startLivenessWatchdog() {
+        val thread =
+            Thread(
+                {
+                    while (true) {
+                        try {
+                            Thread.sleep(WATCHDOG_TICK_MS)
+                            val idle = System.currentTimeMillis() - lastCallAt.get()
+                            if (idle > CLIENT_IDLE_TIMEOUT_MS) {
+                                Log.i(
+                                    TAG,
+                                    "no client calls for ${idle}ms — exiting so the devices are " +
+                                        "released instead of being orphaned"
+                                )
+                                try {
+                                    UInputNative.destroy()
+                                } catch (_: Throwable) {
+                                }
+                                System.exit(0)
+                            }
+                        } catch (_: InterruptedException) {
+                            return@Thread
+                        }
+                    }
+                },
+                "uinput-liveness"
+            )
+        thread.isDaemon = true
+        thread.start()
     }
 
     override fun selectBackend(preferred: Int): Int = try {
@@ -69,6 +128,7 @@ class UInputService : IUInputService.Stub {
         dpadX: Int,
         dpadY: Int
     ) {
+        lastCallAt.set(System.currentTimeMillis())
         try {
             UInputNative.sendFrame(
                 buttons,
@@ -87,6 +147,7 @@ class UInputService : IUInputService.Stub {
     }
 
     override fun sendMouseFrame(relX: Int, relY: Int, scrollY: Int, keys: Int) {
+        lastCallAt.set(System.currentTimeMillis())
         try {
             UInputNative.sendMouseFrame(relX, relY, scrollY, keys)
         } catch (t: Throwable) {
@@ -94,11 +155,15 @@ class UInputService : IUInputService.Stub {
         }
     }
 
-    override fun pollForceFeedback(): IntArray? = try {
-        UInputNative.pollFFEvent()
-    } catch (t: Throwable) {
-        Log.e(TAG, "pollFFEvent failed: ${t.message}")
-        null
+    override fun pollForceFeedback(): IntArray? {
+        // Called at 50 Hz by the app while it is alive — the main proof of life.
+        lastCallAt.set(System.currentTimeMillis())
+        return try {
+            UInputNative.pollFFEvent()
+        } catch (t: Throwable) {
+            Log.e(TAG, "pollFFEvent failed: ${t.message}")
+            null
+        }
     }
 
     override fun runShellCommand(cmd: Array<String>?): Int {
