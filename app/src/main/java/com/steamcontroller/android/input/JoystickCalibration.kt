@@ -1,6 +1,5 @@
 package com.steamcontroller.android.input
 
-import kotlin.math.abs
 import kotlin.math.sqrt
 
 // Per-stick calibration applied to raw SC2026 Int16 values (-32768..32767)
@@ -8,11 +7,14 @@ import kotlin.math.sqrt
 data class StickCalibration(
     val centerX: Int = 0,
     val centerY: Int = 0,
-    val deadzonePercent: Int = 8,   // 0..100 — radial deadzone as % of full range
-    val invertY: Boolean = false
+    val deadzonePercent: Int = 8, // 0..100 — radial deadzone as % of full range
+    val invertY: Boolean = false,
 ) {
     // Returns calibrated (x, y) in the same Int16 range, with deadzone applied radially.
-    fun apply(rawX: Int, rawY: Int): Pair<Int, Int> {
+    fun apply(
+        rawX: Int,
+        rawY: Int,
+    ): Pair<Int, Int> {
         // 1. Subtract center offset
         var x = rawX - centerX
         var y = rawY - centerY

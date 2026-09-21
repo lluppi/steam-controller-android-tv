@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="0dp"
+    app:strokeColor="?attr/colorOutlineVariant"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="18dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:letterSpacing="0.18"
+            android:text="@string/calib_gyro_header"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchGyroEnabled"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/calib_gyro_enable"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnGyroActivation"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/calib_gyro_activation"
+            android:textSize="12sp" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sliderGyroSensitivity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:contentDescription="@string/calib_gyro_sensitivity"
+            android:stepSize="0.1"
+            android:value="1.0"
+            android:valueFrom="0.1"
+            android:valueTo="3.0" />
+
+        <TextView
+            android:id="@+id/tvGyroSensitivity"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="1.0×"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="14sp"
+            tools:ignore="HardcodedText" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sliderGyroSensitivityY"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/calib_gyro_sensitivity_y"
+            android:stepSize="0.1"
+            android:value="1.0"
+            android:valueFrom="0.1"
+            android:valueTo="3.0" />
+
+        <TextView
+            android:id="@+id/tvGyroSensitivityY"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="1.0× vertical"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="14sp"
+            tools:ignore="HardcodedText" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sliderGyroSmoothing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/calib_gyro_smoothing"
+            android:stepSize="0.05"
+            android:value="0.25"
+            android:valueFrom="0.0"
+            android:valueTo="0.9" />
+
+        <TextView
+            android:id="@+id/tvGyroSmoothing"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="25% smoothing"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="14sp"
+            tools:ignore="HardcodedText" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sliderGyroDeadzone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/calib_gyro_deadzone"
+            android:stepSize="0.005"
+            android:value="0.02"
+            android:valueFrom="0.0"
+            android:valueTo="0.1" />
+
+        <TextView
+            android:id="@+id/tvGyroDeadzone"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="0.020 rad/s deadzone"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="14sp"
+            tools:ignore="HardcodedText" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sliderGyroResponse"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/calib_gyro_response"
+            android:stepSize="0.1"
+            android:value="1.0"
+            android:valueFrom="1.0"
+            android:valueTo="2.0" />
+
+        <TextView
+            android:id="@+id/tvGyroResponse"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="1.0 response"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="14sp"
+            tools:ignore="HardcodedText" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnGyroCalibrate"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/calib_gyro_calibrate"
+            android:textSize="12sp" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchGyroInvertY"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/calib_gyro_invert_y"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

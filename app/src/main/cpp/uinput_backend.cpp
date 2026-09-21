@@ -6,6 +6,7 @@
 // /dev/uinput belongs to system:bluetooth — in which case uhid_backend takes over.
 #define LOG_TAG "uinput_backend"
 #include "output_backend.h"
+#include "hid_common.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -23,6 +24,7 @@ constexpr int MAX_FF_EFFECTS = 4;
 class UinputBackend : public OutputBackend {
 public:
     const char* name() const override { return "uinput"; }
+    bool supportsRumble() const override { return true; }
     const char* probeDetail() const override { return detail_; }
 
     bool probe() override {
@@ -252,22 +254,12 @@ public:
 
     void destroyDevices() override {
         bool destroyed = false;
-        if (fd_gamepad_ >= 0) {
-            ioctl(fd_gamepad_, UI_DEV_DESTROY);
-            close(fd_gamepad_);
-            fd_gamepad_ = -1;
-            destroyed = true;
-        }
-        if (fd_mouse_ >= 0) {
-            ioctl(fd_mouse_, UI_DEV_DESTROY);
-            close(fd_mouse_);
-            fd_mouse_ = -1;
-            destroyed = true;
-        }
-        if (fd_kbd_ >= 0) {
-            ioctl(fd_kbd_, UI_DEV_DESTROY);
-            close(fd_kbd_);
-            fd_kbd_ = -1;
+        int* const devices[] = { &fd_gamepad_, &fd_mouse_, &fd_kbd_ };
+        for (int* fd : devices) {
+            if (*fd < 0) continue;
+            ioctl(*fd, UI_DEV_DESTROY);
+            close(*fd);
+            *fd = -1;
             destroyed = true;
         }
         // Any cached delta-state belonged to the destroyed device — reset.

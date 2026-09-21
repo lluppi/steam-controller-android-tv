@@ -5,6 +5,7 @@
 // already ships), this layer is backend-agnostic: it probes both backends and picks one.
 #define LOG_TAG "virtual_input"
 #include "output_backend.h"
+#include "hid_common.h"
 
 #include <jni.h>
 #include <stdarg.h>
@@ -94,7 +95,7 @@ Java_com_steamcontroller_android_uinput_UInputNative_backendDetail(JNIEnv* env, 
 // Whether games can receive rumble through the selected backend.
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_steamcontroller_android_uinput_UInputNative_supportsRumble(JNIEnv*, jclass) {
-    return g_backend_id == BACKEND_UINPUT ? JNI_TRUE : JNI_FALSE;
+    return g_backend != nullptr && g_backend->supportsRumble() ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL

@@ -1,7 +1,6 @@
 package com.steamcontroller.android
 
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.widget.ImageView
@@ -22,7 +21,6 @@ import kotlinx.coroutines.withContext
  * NamedProfile. The selection is saved back onto the profile's `boundPackages` list.
  */
 class AppPickerActivity : AppCompatActivity() {
-
     companion object {
         const val EXTRA_PROFILE_ID = "profile_id"
         const val EXTRA_PRESELECTED = "preselected_packages"
@@ -32,7 +30,11 @@ class AppPickerActivity : AppCompatActivity() {
     private var profileId: String = ""
     private val checkedPackages = mutableSetOf<String>()
 
-    private data class AppEntry(val packageName: String, val label: String, val icon: Drawable)
+    private data class AppEntry(
+        val packageName: String,
+        val label: String,
+        val icon: Drawable,
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,7 +49,9 @@ class AppPickerActivity : AppCompatActivity() {
             if (item.itemId == R.id.action_save) {
                 persistAndFinish()
                 true
-            } else false
+            } else {
+                false
+            }
         }
 
         loadAppsAsync()
@@ -64,11 +68,12 @@ class AppPickerActivity : AppCompatActivity() {
             .setTitle("Enable auto-switch?")
             .setMessage(
                 "To swap profiles automatically when you launch a bound app, allow Steam Controller " +
-                "to read \"Usage data access\" in Android Settings. Without it, your bindings are saved " +
-                "but no automatic switching will happen."
-            )
-            .setPositiveButton("Open Settings") { d, _ -> UsageStatsHelper.openSettingsScreen(this); d.dismiss() }
-            .setNegativeButton("Skip", null)
+                    "to read \"Usage data access\" in Android Settings. Without it, your bindings are saved " +
+                    "but no automatic switching will happen.",
+            ).setPositiveButton("Open Settings") { d, _ ->
+                UsageStatsHelper.openSettingsScreen(this)
+                d.dismiss()
+            }.setNegativeButton("Skip", null)
             .show()
     }
 
@@ -91,17 +96,20 @@ class AppPickerActivity : AppCompatActivity() {
 
         val combined = pm.queryIntentActivities(mainIntent, 0) + pm.queryIntentActivities(leanbackIntent, 0)
         val seen = HashSet<String>()
-        return combined.mapNotNull { ri ->
-            val pkg = ri.activityInfo?.packageName ?: return@mapNotNull null
-            if (!seen.add(pkg)) return@mapNotNull null
-            try {
-                AppEntry(
-                    packageName = pkg,
-                    label = ri.loadLabel(pm).toString(),
-                    icon = ri.loadIcon(pm),
-                )
-            } catch (_: Throwable) { null }
-        }.sortedBy { it.label.lowercase() }
+        return combined
+            .mapNotNull { ri ->
+                val pkg = ri.activityInfo?.packageName ?: return@mapNotNull null
+                if (!seen.add(pkg)) return@mapNotNull null
+                try {
+                    AppEntry(
+                        packageName = pkg,
+                        label = ri.loadLabel(pm).toString(),
+                        icon = ri.loadIcon(pm),
+                    )
+                } catch (_: Throwable) {
+                    null
+                }
+            }.sortedBy { it.label.lowercase() }
     }
 
     private fun renderRows(entries: List<AppEntry>) {
@@ -114,8 +122,11 @@ class AppPickerActivity : AppCompatActivity() {
             val sw = row.findViewById<MaterialSwitch>(R.id.switchAppBound)
             sw.isChecked = entry.packageName in checkedPackages
             sw.setOnCheckedChangeListener { _, checked ->
-                if (checked) checkedPackages.add(entry.packageName)
-                else checkedPackages.remove(entry.packageName)
+                if (checked) {
+                    checkedPackages.add(entry.packageName)
+                } else {
+                    checkedPackages.remove(entry.packageName)
+                }
             }
             row.setOnClickListener { sw.toggle() }
 
@@ -124,7 +135,10 @@ class AppPickerActivity : AppCompatActivity() {
     }
 
     private fun persistAndFinish() {
-        if (profileId.isEmpty()) { finish(); return }
+        if (profileId.isEmpty()) {
+            finish()
+            return
+        }
         val existing = Prefs.listNamedProfiles(this).firstOrNull { it.id == profileId }
         if (existing == null) {
             Toast.makeText(this, "Profile no longer exists", Toast.LENGTH_SHORT).show()

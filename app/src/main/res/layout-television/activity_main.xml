@@ -54,16 +54,6 @@
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnCheckUpdate"
-                style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="8dp"
-                android:contentDescription="@string/main_check_update_desc"
-                app:icon="@drawable/ic_update"
-                app:iconSize="22dp" />
-
-            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnGithub"
                 style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
                 android:layout_width="48dp"
@@ -93,7 +83,9 @@
             android:focusable="true"
             app:cardBackgroundColor="@color/status_idle_container"
             app:cardCornerRadius="14dp"
-            app:cardElevation="0dp">
+            app:cardElevation="0dp"
+            app:strokeColor="@color/focusable_card_stroke"
+            app:strokeWidth="3dp">
 
             <TextView
                 android:id="@+id/tvShizukuStatus"
@@ -277,60 +269,6 @@
                             app:iconSize="16dp" />
                     </com.google.android.material.button.MaterialButtonToggleGroup>
 
-                    <!-- Gamepad variant radios (visible only in Gamepad mode) -->
-                    <LinearLayout
-                        android:id="@+id/gamepadVariantSection"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:visibility="gone">
-
-                        <RadioGroup
-                            android:id="@+id/radioGroupGamepadRow1"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <com.google.android.material.radiobutton.MaterialRadioButton
-                                android:id="@+id/rbXbox360"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="@string/main_gamepad_xbox360"
-                                android:textSize="12sp" />
-
-                            <com.google.android.material.radiobutton.MaterialRadioButton
-                                android:id="@+id/rbXboxOne"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="@string/main_gamepad_xboxone"
-                                android:textSize="12sp" />
-                        </RadioGroup>
-
-                        <RadioGroup
-                            android:id="@+id/radioGroupGamepadRow2"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <com.google.android.material.radiobutton.MaterialRadioButton
-                                android:id="@+id/rbDualShock4"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="@string/main_gamepad_ds4"
-                                android:textSize="12sp" />
-
-                            <com.google.android.material.radiobutton.MaterialRadioButton
-                                android:id="@+id/rbDualSense"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="@string/main_gamepad_dualsense"
-                                android:textSize="12sp" />
-                        </RadioGroup>
-                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
@@ -388,7 +326,10 @@
             android:text="@string/btn_start"
             android:textSize="16sp"
             android:textStyle="bold"
-            app:cornerRadius="18dp" />
+            app:backgroundTint="@color/btn_service_bg"
+            app:cornerRadius="18dp"
+            app:strokeColor="@color/btn_service_stroke"
+            app:strokeWidth="3dp" />
 
         <!-- ━━━━━━━━━━━━ Action cards (horizontal row) ━━━━━━━━━━━━ -->
         <LinearLayout
@@ -409,8 +350,8 @@
                 android:focusable="true"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                app:strokeColor="@color/focusable_card_stroke"
+                app:strokeWidth="3dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -448,8 +389,8 @@
                 android:focusable="true"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                app:strokeColor="@color/focusable_card_stroke"
+                app:strokeWidth="3dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -487,8 +428,8 @@
                 android:focusable="true"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                app:strokeColor="@color/focusable_card_stroke"
+                app:strokeWidth="3dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -525,8 +466,8 @@
                 android:focusable="true"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                app:strokeColor="@color/focusable_card_stroke"
+                app:strokeWidth="3dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"

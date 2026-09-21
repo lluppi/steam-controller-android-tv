@@ -11,6 +11,7 @@
 // hid_descriptors.h for why they cannot be merged into one device).
 #define LOG_TAG "uhid_backend"
 #include "output_backend.h"
+#include "hid_common.h"
 #include "hid_descriptors.h"
 
 #include <errno.h>
@@ -44,6 +45,7 @@ void put_le16(uint8_t* dst, int value) {
 class UhidBackend : public OutputBackend {
 public:
     const char* name() const override { return "uhid"; }
+    bool supportsRumble() const override { return false; }
     const char* probeDetail() const override { return detail_; }
 
     bool probe() override {
@@ -184,9 +186,7 @@ public:
             uhid_event ev;
             memset(&ev, 0, sizeof(ev));
             ev.type = UHID_DESTROY;
-            if (::write(dev->fd, &ev, UHID_EVENT_SIZE) != (ssize_t)UHID_EVENT_SIZE) {
-                LOGE("%s: UHID_DESTROY failed: %s", dev->kind, strerror(errno));
-            }
+            writeEvent(dev->fd, dev->kind, ev, "UHID_DESTROY");
             ::close(dev->fd);
             dev->fd = -1;
             destroyed = true;
@@ -202,6 +202,12 @@ private:
     // this, so adding a device stays a one-line change instead of three parallel edits.
     UhidDevice* const devices_[3] = { &gamepad_, &mouse_, &kbd_ };
     char detail_[64] = "not probed";
+
+    static bool writeEvent(int fd, const char* kind, const uhid_event& event, const char* action) {
+        if (::write(fd, &event, UHID_EVENT_SIZE) == (ssize_t)UHID_EVENT_SIZE) return true;
+        LOGE("%s: %s failed: %s", kind, action, strerror(errno));
+        return false;
+    }
 
     // HID hat: 1..8 clockwise from up, 0 = centred (null state). Inputs are in the same
     // convention as the uinput backend's ABS_HAT0 values (Y negative = up).
@@ -241,8 +247,7 @@ private:
         ev.u.create2.country = 0;
         memcpy(ev.u.create2.rd_data, rd, rd_size);
 
-        if (::write(fd, &ev, UHID_EVENT_SIZE) != (ssize_t)UHID_EVENT_SIZE) {
-            LOGE("%s: UHID_CREATE2 failed: %s", kind, strerror(errno));
+        if (!writeEvent(fd, kind, ev, "UHID_CREATE2")) {
             ::close(fd);
             return false;
         }
@@ -283,11 +288,7 @@ private:
         ev.type = UHID_INPUT2;
         ev.u.input2.size = (uint16_t)len;
         memcpy(ev.u.input2.data, data, len);
-        if (::write(dev.fd, &ev, UHID_EVENT_SIZE) != (ssize_t)UHID_EVENT_SIZE) {
-            LOGE("%s: UHID_INPUT2 failed: %s", dev.kind, strerror(errno));
-            return false;
-        }
-        return true;
+        return writeEvent(dev.fd, dev.kind, ev, "UHID_INPUT2");
     }
 
     // Drain everything the kernel has queued for us. Called from the frame path rather
@@ -327,9 +328,7 @@ private:
                 reply.type = UHID_GET_REPORT_REPLY;
                 reply.u.get_report_reply.id = ev.u.get_report.id;
                 reply.u.get_report_reply.err = (uint16_t)(-EIO);
-                if (::write(dev.fd, &reply, UHID_EVENT_SIZE) != (ssize_t)UHID_EVENT_SIZE) {
-                    LOGE("%s: GET_REPORT reply failed: %s", dev.kind, strerror(errno));
-                }
+                writeEvent(dev.fd, dev.kind, reply, "GET_REPORT reply");
                 break;
             }
             case UHID_SET_REPORT: {
@@ -340,9 +339,7 @@ private:
                 reply.type = UHID_SET_REPORT_REPLY;
                 reply.u.set_report_reply.id = ev.u.set_report.id;
                 reply.u.set_report_reply.err = 0;
-                if (::write(dev.fd, &reply, UHID_EVENT_SIZE) != (ssize_t)UHID_EVENT_SIZE) {
-                    LOGE("%s: SET_REPORT reply failed: %s", dev.kind, strerror(errno));
-                }
+                writeEvent(dev.fd, dev.kind, reply, "SET_REPORT reply");
                 break;
             }
             case UHID_OUTPUT:

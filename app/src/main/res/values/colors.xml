@@ -6,6 +6,8 @@
     <color name="window_bg">#1B2838</color>
 
     <color name="chip_inactive">#8F98A0</color>
+    <color name="action_fill">#66C0F4</color>
+    <color name="action_fill_focused">#A6DEFF</color>
 
     <!-- Status pill — connected/active state (green). -->
     <color name="status_connected_container">#1F3A2A</color>

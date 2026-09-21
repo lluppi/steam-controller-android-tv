@@ -8,7 +8,10 @@ import com.steamcontroller.android.parser.Buttons
  *
  * NONE (bit = -1) means "no event emitted for this source".
  */
-enum class MouseTarget(val bit: Int, val displayName: String) {
+enum class MouseTarget(
+    val bit: Int,
+    val displayName: String,
+) {
     NONE(-1, "(none)"),
 
     // Navigation keys
@@ -39,36 +42,8 @@ enum class MouseTarget(val bit: Int, val displayName: String) {
     // Mouse buttons (bits 16-18 in the native frame)
     BTN_LEFT(16, "🖱 Left click"),
     BTN_RIGHT(17, "🖱 Right click"),
-    BTN_MIDDLE(18, "🖱 Middle click")
+    BTN_MIDDLE(18, "🖱 Middle click"),
 }
-
-/** Hardcoded V1.1 mapping. Customisable mapping UI will land later. */
-val DEFAULT_MOUSE_MAPPING: Map<SteamButton, MouseTarget> = mapOf(
-    // A = DPAD_CENTER so it acts like an Android remote "OK": selects letters on the
-    // Leanback IME, clicks focused UI buttons, and on text fields most apps treat it
-    // the same as ENTER. The dedicated ENTER key is still reachable via remap if needed.
-    SteamButton.A to MouseTarget.KEY_DPAD_CENTER,
-    SteamButton.B to MouseTarget.KEY_BACK,
-    SteamButton.X to MouseTarget.KEY_SPACE,
-    SteamButton.Y to MouseTarget.KEY_TAB,
-    SteamButton.LB to MouseTarget.BTN_RIGHT,
-    SteamButton.RB to MouseTarget.BTN_LEFT,
-    // Triggers default to NONE in Desktop too — scroll is already on the left trackpad.
-    SteamButton.LT to MouseTarget.NONE,
-    SteamButton.RT to MouseTarget.NONE,
-    SteamButton.LS to MouseTarget.KEY_HOME,
-    SteamButton.RS to MouseTarget.BTN_MIDDLE,
-    SteamButton.MENU to MouseTarget.KEY_MENU,
-    SteamButton.VIEW to MouseTarget.KEY_ESC,
-    SteamButton.STEAM to MouseTarget.KEY_HOME,
-    SteamButton.QUICK_ACCESS to MouseTarget.KEY_PLAY_PAUSE,
-    SteamButton.L4 to MouseTarget.KEY_VOLUME_DOWN,
-    SteamButton.R4 to MouseTarget.KEY_VOLUME_UP,
-    SteamButton.L5 to MouseTarget.KEY_BACKSPACE,
-    SteamButton.R5 to MouseTarget.NONE,
-    SteamButton.GRIP_LT to MouseTarget.NONE,
-    SteamButton.GRIP_RT to MouseTarget.NONE
-)
 
 /**
  * Source bits that route to *fixed* targets in mouse mode (not customisable in V1.1):
@@ -76,12 +51,13 @@ val DEFAULT_MOUSE_MAPPING: Map<SteamButton, MouseTarget> = mapOf(
  *  - Left trackpad click → right mouse click
  *  - Right trackpad motion → cursor delta (handled separately, not a button)
  */
-val MOUSE_MODE_FIXED_DPAD = mapOf(
-    Buttons.DPAD_UP to MouseTarget.KEY_UP,
-    Buttons.DPAD_DOWN to MouseTarget.KEY_DOWN,
-    Buttons.DPAD_LEFT to MouseTarget.KEY_LEFT,
-    Buttons.DPAD_RIGHT to MouseTarget.KEY_RIGHT
-)
+val MOUSE_MODE_FIXED_DPAD =
+    mapOf(
+        Buttons.DPAD_UP to MouseTarget.KEY_UP,
+        Buttons.DPAD_DOWN to MouseTarget.KEY_DOWN,
+        Buttons.DPAD_LEFT to MouseTarget.KEY_LEFT,
+        Buttons.DPAD_RIGHT to MouseTarget.KEY_RIGHT,
+    )
 const val MOUSE_LEFT_PAD_CLICK_BIT = Buttons.TP_LT_CLICK
 
 /** Right trackpad click. The right pad drives the cursor, so its click is the primary one. */

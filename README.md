@@ -1,213 +1,153 @@
-# Steam Controller for Android
+# steam controller on android tv
 
-Use the **Steam Controller 2026** (Valve, codename *Ibex*) as a standard Android gamepad — no root required. Connect via USB OTG / wireless Puck, or directly via Bluetooth.
+use a steam controller 2026 (valve, codename ibex) as a standard android gamepad, no root. usb otg or the wireless puck, or bluetooth le directly. the app parses the controller's proprietary hid protocol and exposes it as an xbox 360-compatible virtual gamepad; a desktop mode turns the same controller into a mouse and keyboard for android tv.
 
-The app reads the controller's proprietary HID protocol and exposes it to Android as a virtual gamepad (accessed via Shizuku), so any game that supports controllers sees a real input device — Xbox 360, Xbox One, DualShock 4 or DualSense, your choice. A **Desktop mode** turns the same controller into a virtual mouse + keyboard, ideal for Android TV boxes.
+this is a fork of [sonicdx12/steamcontroller-android](https://github.com/SonicDX12/SteamController-Android) that adds a `/dev/uhid` output backend for devices where `/dev/uinput` is closed to the shell uid - notably the nvidia shield tv, where it belongs to `system:bluetooth`. the controller still appears as a real `InputDevice`, with no root and no fallback to input injection.
 
-This is a fork of [SonicDX12/SteamController-Android](https://github.com/SonicDX12/SteamController-Android) that adds a **`/dev/uhid` output backend** for devices where `/dev/uinput` is closed to the shell UID — notably the NVIDIA Shield TV, where it belongs to `system:bluetooth`. The controller then still appears as a real `InputDevice`, with no root and no fallback to input injection. See `PLAN.md` and `HANDOVER.md`.
+| transport | how |
+| --- | --- |
+| usb otg | wired, or via the wireless puck dongle |
+| bluetooth le | pair the controller directly, no dongle |
 
-## Features
+| output profile | what android sees |
+| --- | --- |
+| xbox 360 gamepad | `Microsoft X-Box 360 pad`, plus an optional mouse/keyboard sidecar |
+| desktop | virtual mouse (right trackpad cursor, left trackpad scroll) and keyboard |
 
-### Connection
+| backend | when |
+| --- | --- |
+| `/dev/uinput` | preferred where the shell uid can open it - the only one with force feedback |
+| `/dev/uhid` | where uinput is denied, e.g. the shield tv; the descriptor goes to the kernel and `hid-generic` makes the same devices |
+| `injectInputEvent` | last resort where selinux refuses both; most games filter it |
 
-- **USB OTG** — wired or via the wireless Puck dongle
-- **Bluetooth LE** — direct pairing with the controller, no dongle needed
-- **Live transport switching** in the UI (toggle group with USB and Bluetooth icons)
-- **Refresh paired BT devices** without restarting the app
-- **In-app help dialog** explaining the controller's wireless mode combos (Steam+A+R1, Steam+B+R1, etc.)
+which one is in use is probed at runtime, and named on the status card together with the reason when one is unavailable.
 
-### Emulation
+## requirements
 
-- **Five virtual profiles**: Xbox 360 (default), Xbox One, Sony DualShock 4, Sony DualSense, and **Desktop** (mouse + keyboard)
-- **Cycle gamepad profiles directly from the notification** (`↻ → next profile`) without opening the app
-- **Real `InputDevice`** via Linux `uinput` (UID shell via Shizuku UserService) — recognised by games as a real gamepad, not filtered like injected events
-- **Automatic fallback** to `IInputManager.injectInputEvent` if `/dev/uinput` is denied (less compatible, kept as safety net)
+- android 8.0+ (api 26) - phone, tablet or android tv; the app supports `arm64-v8a`, `armeabi-v7a` and `x86_64`
+- [shizuku](https://shizuku.rikka.app/) installed and running
+- usb host (otg) support for the wired and puck paths
+- a steam controller 2026 (valve ibex). the older steam controller is not supported
 
-### Desktop mode
+## setup
 
-- Turns the controller into a virtual **mouse + keyboard** — right trackpad drives the cursor, left trackpad scrolls, buttons map to common keys (volume, play/pause, back, home, enter, escape, tab, space, etc.)
-- Even while a gamepad profile is active, the trackpads can double as a mouse sidecar (toggle in Calibration) so you can still navigate menus without switching profiles
-- Full **Android TV** support: dedicated banner/leanback UI, D-pad focus navigation, on-screen keyboard shows up correctly when a text field is focused
+1. install shizuku and start it (adb wireless on android 11+, a one-time adb cable below that)
+2. install this app and grant the shizuku permission when prompted
+3. grant `POST_NOTIFICATIONS` when asked (android 13+) so the foreground status notification shows up
+4. usb: plug the puck or the controller into the otg port, android asks for usb permission. bluetooth: pair the controller via settings first, then pick it in the app's device dropdown, `↻` if you just paired it
+5. pick the emulated profile - xbox 360 is the safest default for games, desktop for mouse + keyboard
+6. hit **start service**. the card shows `Mode: <profile> (uinput) ✓` when it is up
+7. optional: tune calibration, mapping and rumble, save it as a game profile, bind it to an app so it auto-loads
 
-### Game Profiles
+everything is live: most changes apply within ~250 ms, without a restart. changing transport or profile restarts the service (or use the notification's profile cycle action).
 
-- Save the current calibration, button mapping, rumble intensity and mouse sensitivity as a **named preset**
-- Load, rename, duplicate or delete presets from a dedicated screen
-- **Bind a preset to one or more apps** — the service automatically switches profile when you launch a bound game (foreground-app detection, no manual step)
+## how it works
 
-### Tuning
-
-- **Per-stick calibration** — radial dead zone (0–30%), center offset capture, Y-axis inversion, live 2D preview
-- **Custom button mapping** — categorised list (Face / Bumpers / Triggers full-press / Stick clicks / System / Back paddles / Grips), using the official Steam Input button icons. Any source button to any target, including back paddles L4/L5/R4/R5, the Quick Access Menu button, and forcing a trigger to "fully pulled"
-- **Special actions** — map any button to **📸 Take screenshot** (saved in Pictures/Screenshots, visible immediately in the gallery)
-- **Rumble forwarding pipeline** with adjustable intensity (0–100%) and a manual "Test rumble" button (Bluetooth only for now — see Known limitations)
-
-### Backup & restore
-
-- **Export** every live setting and all Game Profiles to a single JSON file via the system file picker
-- **Import** that file back at any time — handy after reinstalling the app or moving to a new phone
-
-### Auto-update
-
-- Checks GitHub Releases for a newer version at launch (once every 24h) or on demand
-- Shows the release notes and downloads the signed APK straight from GitHub, then hands off to the system installer
-
-### Debug & status
-
-- **HID debug view** — every button, stick, trigger, trackpad, IMU quaternion and raw hex dump, updated at the controller's ~300 Hz
-- **Battery indicator** in the status card and in the notification — works over both USB and Bluetooth
-- **Persistent foreground service notification** with the active emulation profile, battery, profile-cycle action, and stop action
-
-### Platform
-
-- **Material 3** design with Steam blue accents
-- **Adaptive layouts** — phone (max-width 520dp), tablet (`sw600dp`, two-column layouts) and Android TV (`television`, leanback navigation)
-
-## Requirements
-
-- Android 8.0+ (API 26) — phone, tablet, or Android TV
-- [Shizuku](https://shizuku.rikka.app/) installed and running
-- For USB: USB Host (OTG) support on the phone/tablet
-- For Bluetooth: standard BLE (available on every modern Android)
-- A **Steam Controller 2026** (Valve Ibex). The older Steam Controller is not yet supported.
-
-## Setup
-
-1. Install [Shizuku](https://shizuku.rikka.app/) and start it (ADB Wireless on Android 11+, or one-time ADB cable for older versions).
-2. Install this app and grant it the Shizuku permission when prompted.
-3. Grant the **POST_NOTIFICATIONS** permission when asked (Android 13+) so the foreground status notification shows up.
-4. **For USB**: plug the Puck (or the controller directly) into the OTG port. Android will ask for USB permission.
-5. **For Bluetooth**: pair the controller via Android Settings → Bluetooth first, then select it from the Bluetooth device dropdown in the app. Use the `↻` refresh button if you just paired it.
-6. Pick the emulated controller profile (Xbox 360 is the safest default for games — broadest compatibility. Pick Desktop for mouse + keyboard, e.g. on Android TV).
-7. Hit **Start Service**. The status card shows `Mode: <profile> (uinput) ✓` when everything is up.
-8. Optional: tune everything to your liking (calibration, mapping, rumble) and save it as a **Game Profile** — bind it to a game so it auto-loads next time you launch it.
-
-If `uinput` is blocked by SELinux on your device (rare on stock Android, possible on some hardened ROMs), the app falls back to `injectInputEvent`, which works in most apps but is filtered by many games.
-
-## How it works
-
-```
-Steam Controller (USB or BT)
+```text
+steam controller (usb or bt)
          │
          ▼
-HID report parser  (report 0x45 state, 53B USB / 45B BLE — plus a
-                     dedicated 0x43 battery status report)
-         │  validated against SteamlessController.h + hardware capture
-         ▼
-ControllerService
-   • debounce (15-bit injectable mask, 3 frames)
-   • baseline state (ignore buttons held at startup)
-   • mapping (Steam buttons → Xbox buttons or special actions)
-   • per-stick calibration
-   • rumble intensity scaling
-   • foreground-app polling → Game Profile auto-switch
+hid report parser   report 0x45 state, 53b usb / 45b ble,
+                    plus a 0x43 battery status report
          │
          ▼
-UInputGamepad → AIDL/Binder → UInputService (UID shell via Shizuku)
-                                       │
-                                       ▼
-                                JNI uinput_jni.cpp
-                                       │
-                          ┌────────────┴────────────┐
-                          ▼                          ▼
-                  gamepad device            mouse+keyboard sidecar
-                (Xbox/DS4/DualSense)      (Desktop mode, or trackpad-
-                                            as-mouse alongside a gamepad)
-                          │                          │
-                          └────────────┬─────────────┘
-                                       ▼
-                       backend seam (cpp/output_backend.h)
-                    ┌──────────────────┴──────────────────┐
-                    ▼                                     ▼
-            /dev/uinput → kernel                  /dev/uhid → kernel
-       preferred where the shell UID can      used where /dev/uinput is denied,
-       open it (it has force feedback)        e.g. NVIDIA Shield TV, where it
-                                              belongs to system:bluetooth
-                    └──────────────────┬──────────────────┘
-                                       ▼
-                        Android sees a real "Microsoft
-                       X-Box 360 pad" (or DS4, mouse, etc.)
+ControllerService   debounce (15-bit injectable mask, 3 frames),
+                    startup baseline, button mapping, per-stick
+                    calibration, rumble scaling, foreground-app
+                    polling → game profile auto-switch
+         │
+         ▼
+UInputGamepad → AIDL → UInputService (uid shell via shizuku)
+         │
+         ▼
+jni uinput_jni.cpp  → backend seam (cpp/output_backend.h)
+         │
+    ┌────┴────┐
+    ▼         ▼
+uinput     uhid            both, plus mouse+keyboard sidecars,
+(kernel)   (kernel)        land as a real "Microsoft X-Box 360 pad"
 ```
 
-The HID protocol is parsed natively and translated into the chosen profile's button/axis layout before being written to virtual devices. The Shizuku `UserService` runs as the `shell` user (UID 2000). Which backend it uses is decided at runtime by probing both: `uinput` first where it is permitted, because only it can deliver force feedback, and `uhid` otherwise — where the descriptor is handed to the kernel and `hid-generic` produces the same three devices. The one in use is named on the status card.
+the parser is native, and translates the hid report into the chosen profile's layout before writing to virtual devices. the shizuku `UserService` runs as the `shell` user (uid 2000) and probes both backends: `uinput` first where it is permitted, because only it can deliver force feedback, `uhid` otherwise.
 
-For BLE, the standard HID service (`0x1812`) is claimed by the OS, so the app uses Valve's vendor service (`100f6c32-1735-4313-b402-38567131e5f3`) directly. Connection priority is bumped to `HIGH` after connect to bring the BLE interval from ~50 ms down to ~11 ms.
+for ble, the standard hid service (`0x1812`) is claimed by the os, so the app talks to valve's vendor service (`100f6c32-1735-4313-b402-38567131e5f3`) directly. connection priority is bumped to `HIGH` after connect to bring the ble interval from ~50 ms down to ~11 ms. the controller is resolved from the bonded list, so a re-paired controller works even though ble gives it a new random address every pairing.
 
-## Build
+## build
 
-Standard Android Gradle build, requires:
+standard android gradle build. needs android studio hedgehog or newer, android gradle plugin 8.5+, kotlin 2.0+, and the ndk with cmake 3.22.1 for the native jni library.
 
-- Android Studio Hedgehog or newer
-- Android Gradle Plugin 8.5+
-- Kotlin 2.0+
-- NDK + CMake 3.22.1 (for the native `uinput` JNI library)
+first time: open the project in android studio and let it sync - that regenerates the gradle wrapper. after that:
 
-**First time:** open the project in Android Studio and let it sync — this regenerates the Gradle wrapper. After that:
-
-```bash
+```sh
 ./gradlew assembleDebug
-# APK lands in app/build/outputs/apk/debug/
+# apk lands in app/build/outputs/apk/debug/
 ```
 
-The app supports `arm64-v8a`, `armeabi-v7a` and `x86_64` ABIs.
+signed release builds: `scripts/generate-keystore.sh` makes a keystore, `keystore.properties.template` shows the values it needs, then `./gradlew assembleRelease`. `.github/workflows/release.yml` builds and publishes one when you push a `v*` tag.
 
-For signed release builds and publishing to GitHub Releases, see [RELEASING.md](RELEASING.md).
+## configuration
 
-## Configuration
+live settings and game profiles live in `SharedPreferences`: transport and paired bt address, output mode, per-stick calibration (dead zone 0-30%, centre offset, invert y), per-button mapping (face / bumpers / triggers / stick clicks / system / back paddles / grips, or special actions like `📸 take screenshot`), rumble intensity 0-100%, mouse sensitivity, and named profiles each carrying its own copy plus the apps it switches on automatically.
 
-Live settings and Game Profiles are persisted in `SharedPreferences`:
+`export backup` / `import backup` in the game profiles screen moves all of it to one json file - useful before uninstalling or when moving to a new device.
 
-- Selected transport (USB or Bluetooth) and paired BT device address
-- Emulated profile (Xbox 360 / Xbox One / DS4 / DualSense / Desktop)
-- Per-stick calibration (dead zone, center offset, invert Y)
-- Per-button mapping (source buttons → Xbox targets, keyboard keys, or special actions like screenshot)
-- Rumble intensity (0–100%) and mouse sensitivity (Desktop mode / trackpad sidecar)
-- Named Game Profiles, each with its own copy of the settings above plus the list of apps it auto-switches on
+## troubleshooting
 
-You can tweak everything live — most changes apply within ~250 ms (next mapping cache refresh) without restarting the service. Changing transport or emulated profile requires restarting the service (or use the notification's profile cycle action). Use **Export backup** / **Import backup** in the Game Profiles screen to move all of this to a JSON file — useful before uninstalling the app or when setting it up on a new device.
+**nothing responds, but the os says the controller is bonded.** the controller wakes into the wireless mode it last used, so it is often hunting for a puck that is not there. check the led: hold `b + r1 + steam` until the chime, blue is bluetooth, white is a puck slot, green is wired. the status card doubles as a reconnect action and says the same thing.
 
-## Troubleshooting
+**controller went to sleep.** not a bug, it powers down when idle. the app keeps retrying with backoff and immediately on `ACTION_ACL_CONNECTED`, so pressing steam is enough.
 
-**Nothing responds, but the OS says the controller is bonded.** Check the LED colour. The controller wakes into the wireless mode it last used, so it is often hunting for a puck that is not there: hold `B + R1 + Steam` until the chime and a **blue** LED for Bluetooth (white means a puck slot, green means wired). The status card says this too when the link stalls.
+**everything is dead after a reboot.** shizuku does not survive a reboot on android 9 and cannot be restarted from the tv, so start it from a pc (a copy is pre-staged on the device):
 
-**Controller went to sleep.** Not a bug: it powers itself down when idle, and the app keeps retrying with backoff (and immediately when the Bluetooth link comes back), so pressing Steam is enough — no need to restart the app.
+```sh
+adb shell 'nohup sh -c "CLASSPATH=/data/local/tmp/shizuku.apk app_process /system/bin \
+  --nice-name=shizuku_server moe.shizuku.server.ShizukuService --debug=false" \
+  > /data/local/tmp/shizuku.out 2>&1 &'
+adb shell 'ps -A | grep shizuku_server'      # runs as shell
+```
 
-**Everything is dead after a reboot.** Shizuku does not survive a reboot on Android 9 and cannot be restarted from the TV (there is no wireless-debugging pairing that old). Start it from a PC — the exact command is in `HANDOVER.md` §7 — after which the app picks up on its own. The status card reports this state explicitly.
+the app picks up on its own afterwards. the card reports this state explicitly.
 
-**Testing from a PC: stop the service before installing.** `adb install` kills the app mid-session, and a GATT client that dies without closing leaves the controller wedged until it is power-cycled or re-paired. `adb shell run-as com.steamcontroller.android.debug am stop-service --user 0 -n com.steamcontroller.android.debug/com.steamcontroller.android.service.ControllerService` first, then install.
+**testing from a pc.** stop the service before `adb install` - a gatt client that dies without closing leaves the controller wedged until it is power-cycled or re-paired:
 
-## Known limitations
+```sh
+adb shell run-as com.steamcontroller.android.debug am stop-service --user 0 \
+  -n com.steamcontroller.android.debug/com.steamcontroller.android.service.ControllerService
+```
 
-- **Virtual device backend**: the app probes `/dev/uinput` and falls back to `/dev/uhid`. Where both are refused by SELinux it injects input events instead, which most apps ignore — the status card names the backend in use and the reason when one is unavailable.
-- **Steam button** passes through as `KEYCODE_BUTTON_MODE`. Android handles it as the system "Guide" key which may open the launcher in some setups.
-- **Rumble byte format** is an empirically-tuned best guess based on the Linux `hid-steam` driver. Works over Bluetooth. **USB rumble is not implemented yet** — the controller only vibrates when connected over BT.
-- **Trackpads**: usable as a mouse (Desktop mode, or as an optional sidecar cursor alongside a gamepad profile). Not yet exposed as a DualShock 4/DualSense touchpad to games that support one natively. **The right trackpad click works; the left trackpad click is not reported anywhere in the controller's vendor report**, so it cannot be mapped — the left pad scrolls. Evidence in `docs/evidence/P3-S6.md`.
-- **Rumble needs the `uinput` backend.** `hid-generic` implements no force feedback for the `uhid` descriptors, so on those devices games' rumble requests never arrive. Calibration says so instead of offering a dead test button.
-- **Gyroscope** (quaternion IMU) is parsed but not yet routed anywhere. Gyro aiming is planned for a future release, fits best with the DualShock 4 / DualSense profiles.
-- **Shizuku at reboot**: the user must restart Shizuku after each reboot of the device (an Android limitation, not the app's). The service starts on boot and the status card says what is missing.
+debug builds install side by side with a release build (`applicationIdSuffix = ".debug"`), so testing never replaces a working install.
 
-## Roadmap
+## known limitations
 
-- USB rumble implementation
-- Trackpad as a real touchpad input (DS4/DualSense profile) for games that support it
-- Gyro aiming for DS4 / DualSense profiles
-- Rumble without `uinput` (DualShock 4 emulation via `hid-sony`, which is present on the Shield's kernel)
-- RetroArch autoconfig profiles and back-paddle presets
-- HID debug log export ("Log to File")
+| limitation | detail |
+| --- | --- |
+| no rumble on `uhid` | `hid-generic` implements no force feedback for these descriptors, so games' rumble requests never arrive. calibration says so instead of offering a dead test button |
+| usb rumble | not implemented - the controller only vibrates over bluetooth |
+| left trackpad click | not reported anywhere in the controller's vendor report, so it cannot be mapped. the right pad clicks, the left pad scrolls |
+| trackpads | usable as a mouse, not yet exposed as a ds4/ds5 touchpad to games that support one natively |
+| gyroscope | the quaternion imu is parsed but routed nowhere. gyro aiming is planned |
+| steam button | passes through as `KEYCODE_BUTTON_MODE`, android treats it as the system guide key and may open the launcher |
+| shizuku at reboot | must be restarted by the user after each reboot (android 9 limitation, not the app's) |
+| rumble byte format | empirically tuned from the linux `hid-steam` driver |
+| inject fallback | where selinux refuses both backends the app injects input events, which most apps ignore |
 
-## Credits
+## roadmap
 
-The HID protocol reverse engineering credit goes to:
+- usb rumble
+- trackpad as a real touchpad input (ds4/ds5 profile)
+- gyro aiming for ds4 / ds5
+- rumble without `uinput` (dualshock 4 emulation via `hid-sony`, present on the shield's kernel)
+- retroarch autoconfig profiles and back-paddle presets
+- hid debug log export ("log to file")
 
-- [**SteamlessController**](https://github.com/ddeverill/SteamlessController) by ddeverill — the definitive `SteamController.h` byte layout reference for the SC2026
-- The [**Linux kernel `hid-steam` driver**](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-steam.c) for additional validation of button bit positions and the rumble command structure
+## credits
 
-Other key dependencies:
+- [steamlesscontroller](https://github.com/ddeverill/SteamlessController) by ddeverill - the `SteamController.h` byte layout reference for the sc2026
+- the [linux kernel `hid-steam` driver](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-steam.c) for additional validation of button bit positions and the rumble command structure
+- [shizuku](https://github.com/RikkaApps/Shizuku) by rikkaapps - the `uinput` access path without root
+- the [android usb host api](https://developer.android.com/guide/topics/connectivity/usb/host) and the ble gatt stack
+- [material components for android](https://github.com/material-components/material-components-android) for the material 3 ui
 
-- [Shizuku](https://github.com/RikkaApps/Shizuku) by RikkaApps — the `uinput` access path without root
-- [Android USB Host API](https://developer.android.com/guide/topics/connectivity/usb/host) and the BLE GATT stack
-- [Material Components for Android](https://github.com/material-components/material-components-android) for the Material 3 UI
+## license
 
-## License
-
-MIT — see [LICENSE](LICENSE).
+mit - see [LICENSE](LICENSE), which carries upstream's copyright and this fork's.

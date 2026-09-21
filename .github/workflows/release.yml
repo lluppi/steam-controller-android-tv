@@ -3,39 +3,36 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'   # e.g. v1.0.0, v1.2.3-beta
+      - "v*" # e.g. v1.0.0, v1.2.3-beta
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed to create the GitHub Release
+      contents: write # needed to create the GitHub Release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
-          restore-keys: ${{ runner.os }}-gradle-
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
 
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
         run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::SIGNING_KEYSTORE_BASE64 is not set - refusing to publish an unsigned APK."
+            exit 1
+          fi
           mkdir -p keystore
           echo "$KEYSTORE_BASE64" | base64 -d > keystore/release.jks
 
@@ -54,7 +51,7 @@ jobs:
              "out/SteamControllerAndroid-${GITHUB_REF_NAME}.apk"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: ${{ github.ref_name }}
           generate_release_notes: true

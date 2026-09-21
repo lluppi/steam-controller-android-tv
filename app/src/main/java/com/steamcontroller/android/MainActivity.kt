@@ -1,7 +1,6 @@
 package com.steamcontroller.android
 
 import android.Manifest
-import android.app.DownloadManager
 import android.app.PendingIntent
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
@@ -12,7 +11,7 @@ import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
+import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.widget.ArrayAdapter
@@ -26,13 +25,10 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.steamcontroller.android.bt.BluetoothHidManager
 import com.steamcontroller.android.databinding.ActivityMainBinding
 import com.steamcontroller.android.service.ControllerService
+import com.steamcontroller.android.shizuku.ShizukuStarterService
 import com.steamcontroller.android.uinput.GamepadProfile
 import com.steamcontroller.android.uinput.UInputNative
-import com.steamcontroller.android.update.UpdateChecker
-import com.steamcontroller.android.update.UpdateInstaller
 import com.steamcontroller.android.usb.UsbConnectionManager
-import java.io.File
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import rikka.shizuku.Shizuku
@@ -53,9 +49,8 @@ class MainActivity : AppCompatActivity() {
 
     private val usbPermissionAction = "com.steamcontroller.android.USB_PERMISSION"
     private val githubRepoUrl = "https://github.com/SonicDX12/SteamController-Android"
-
-    private var pendingUpdateDownloadId: Long = -1L
-    private var pendingUpdateApkFile: File? = null
+    private val shizukuPackage = ShizukuStarterService.SHIZUKU_PACKAGE
+    private val tvSettingsStubPackage = "com.google.android.tv.frameworkpackagestubs"
 
     private val usbReceiver =
         object : BroadcastReceiver() {
@@ -92,18 +87,6 @@ class MainActivity : AppCompatActivity() {
                         log("Controller disconnected")
                     }
                 }
-            }
-        }
-
-    private val downloadReceiver =
-        object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
-                if (id == -1L || id != pendingUpdateDownloadId) return
-                val apkFile = pendingUpdateApkFile ?: return
-                pendingUpdateDownloadId = -1L
-                pendingUpdateApkFile = null
-                UpdateInstaller.install(this@MainActivity, apkFile)
             }
         }
 
@@ -146,13 +129,6 @@ class MainActivity : AppCompatActivity() {
             filter,
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
-        ContextCompat.registerReceiver(
-            this,
-            downloadReceiver,
-            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-
         binding.btnToggleService.setOnClickListener {
             if (serviceRunning) {
                 stopControllerService()
@@ -180,10 +156,9 @@ class MainActivity : AppCompatActivity() {
         setupTransportDropdown()
         setupActionCardFocusMemory()
 
-        // The status card doubles as the reconnect affordance ("link lost — tap to reconnect").
-        binding.statusPillCard?.setOnClickListener { restartService() }
+        // The status card starts Shizuku when needed, otherwise it reconnects the controller.
+        binding.statusPillCard?.setOnClickListener { handleStatusAction() }
         setupControlModeToggle()
-        setupGamepadVariantRadios()
         requestNotificationPermissionIfNeeded()
 
         binding.btnRefreshBt.setOnClickListener {
@@ -193,9 +168,6 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnHelp.setOnClickListener { showConnectionHelpDialog() }
         binding.btnGithub.setOnClickListener { openGithubRepo() }
-        binding.btnCheckUpdate.setOnClickListener { checkForUpdates(manual = true) }
-
-        maybeAutoCheckForUpdates()
 
         // One collector for the service's whole state. It used to be four (mode, profile, battery,
         // link) that could disagree with each other, and every new piece of state meant hand-syncing
@@ -309,11 +281,7 @@ class MainActivity : AppCompatActivity() {
             Prefs.setTransport(this, picked)
             updateBtPickerVisibility(picked)
             // Status pill shows the active transport — refresh on change
-            updateShizukuStatus(
-                Shizuku.pingBinder() &&
-                    Shizuku.checkSelfPermission() ==
-                    android.content.pm.PackageManager.PERMISSION_GRANTED
-            )
+            updateShizukuStatus(hasShizukuAccess())
             log("Transport set: ${picked.displayName}")
             if (serviceRunning) {
                 Toast.makeText(this, "Restart the service to apply", Toast.LENGTH_SHORT).show()
@@ -397,10 +365,12 @@ class MainActivity : AppCompatActivity() {
         }.coerceAtLeast(0)
         binding.dropdownBtDevice.setText(labels[currentIdx], false)
         Prefs.setBluetoothAddress(this, pairedBtDevices[currentIdx].address)
+        Prefs.setBluetoothName(this, labels[currentIdx].takeUnless { it == "Unknown" })
 
         binding.dropdownBtDevice.setOnItemClickListener { _, _, position, _ ->
             val picked = pairedBtDevices[position]
             Prefs.setBluetoothAddress(this, picked.address)
+            Prefs.setBluetoothName(this, labels[position].takeUnless { it == "Unknown" })
             log("BT device: ${picked.address}")
         }
     }
@@ -505,12 +475,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Control Mode toggle (Gamepad ↔ Desktop). Replaces the 5-profile dropdown.
-     * Desktop ⇔ GamepadProfile.MOUSE. Gamepad ⇔ the user's last-chosen gamepad
-     * profile (defaults to Xbox 360 on first run). Fine-grained sub-choice
-     * (Xbox 360 vs One vs DS4 vs DualSense) lands in the Profiles panel (Phase 2).
-     */
+    /** Control mode toggle between the Xbox 360 gamepad and Desktop devices. */
     private fun setupControlModeToggle() {
         syncControlModeToggle(Prefs.getProfile(this))
 
@@ -522,17 +487,8 @@ class MainActivity : AppCompatActivity() {
                     R.id.btnModeDesktop -> GamepadProfile.MOUSE
                     else -> return@addOnButtonCheckedListener
                 }
-            if (picked.id == Prefs.getProfile(this).id) {
-                // No profile change, but the user still clicked — re-sync visibility
-                // in case the section was out of sync (e.g. service not running so
-                // profileFlow won't re-emit).
-                syncControlModeToggle(picked)
-                return@addOnButtonCheckedListener
-            }
+            if (picked.id == Prefs.getProfile(this).id) return@addOnButtonCheckedListener
             Prefs.setProfile(this, picked)
-            // Drive visibility + radio sync directly so the gamepad-variant section
-            // hides immediately when the user picks Desktop, even when no service
-            // is running (profileFlow only emits with the service alive).
             syncControlModeToggle(picked)
             log("Control mode → ${picked.displayName}")
             if (serviceRunning) {
@@ -547,38 +503,6 @@ class MainActivity : AppCompatActivity() {
         if (binding.toggleControlMode.checkedButtonId != targetId) {
             binding.toggleControlMode.check(targetId)
         }
-        // Show/hide the gamepad-variant radios and select the right one.
-        binding.gamepadVariantSection?.visibility =
-            if (profile.isMouseMode) View.GONE else View.VISIBLE
-        if (!profile.isMouseMode) syncGamepadVariant(profile)
-    }
-
-    /**
-     * Wires the 4 Xbox/PS radio buttons, split across two RadioGroups (2 per row)
-     * since a single RadioGroup can't lay out a 2×2 grid — it only auto-manages
-     * mutual exclusion among its own *direct* children (nested ViewGroups don't
-     * count), so a flat 2-column arrangement forces two separate groups. Each
-     * group still gets native exclusion + accessibility semantics ("radio button
-     * 1 of 2") within its row; the two rows are cross-cleared manually so only
-     * one of the 4 is ever checked at a time.
-     */
-
-    /**
-     * The variant picker is hidden: this fork emulates one gamepad identity.
-     *
-     * The uhid backend hands the kernel a single Xbox 360 HID descriptor and only varies the
-     * advertised VID/PID and name, so a "DualShock 4" or "DualSense" option could never behave
-     * like one — it advertised Sony IDs with an Xbox descriptor, no touchpad and nothing else those
-     * pads are matched on. Desktop mode is not a variant: it is a different device set with its own
-     * toggle.
-     */
-    private fun setupGamepadVariantRadios() {
-        binding.gamepadVariantSection?.visibility = View.GONE
-    }
-
-    /** Set the right radio to `checked = true` without triggering its listener side-effects. */
-    private fun syncGamepadVariant(profile: GamepadProfile) {
-        binding.rbXbox360?.isChecked = (profile == GamepadProfile.XBOX_360)
     }
 
     private fun openGithubRepo() {
@@ -587,98 +511,6 @@ class MainActivity : AppCompatActivity() {
         } catch (t: Throwable) {
             Toast.makeText(this, "No browser app found", Toast.LENGTH_SHORT).show()
         }
-    }
-
-    private fun maybeAutoCheckForUpdates() {
-        // The update channel is off in this fork (UpdateChecker.REPO is null), so there is nothing
-        // to check and no reason to burn the once-a-day timer on it.
-        if (!UpdateChecker.isEnabled()) return
-        val elapsed = System.currentTimeMillis() - Prefs.getLastUpdateCheckAt(this)
-        if (elapsed < TimeUnit.HOURS.toMillis(24)) return
-        checkForUpdates(manual = false)
-    }
-
-    private fun checkForUpdates(manual: Boolean) {
-        if (!UpdateChecker.isEnabled()) {
-            if (manual) {
-                Toast.makeText(this, R.string.update_disabled, Toast.LENGTH_SHORT).show()
-            }
-            return
-        }
-        lifecycleScope.launch {
-            Prefs.setLastUpdateCheckAt(this@MainActivity, System.currentTimeMillis())
-            val release = UpdateChecker.fetchLatestRelease()
-            if (release == null) {
-                if (manual) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        R.string.update_toast_check_failed,
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-                return@launch
-            }
-            if (!UpdateChecker.isNewer(release.versionName, BuildConfig.VERSION_NAME)) {
-                if (manual) {
-                    Toast
-                        .makeText(
-                            this@MainActivity,
-                            getString(R.string.update_toast_up_to_date, BuildConfig.VERSION_NAME),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                }
-                return@launch
-            }
-            if (!manual &&
-                Prefs.getSkippedUpdateVersion(this@MainActivity) == release.versionName
-            ) {
-                return@launch
-            }
-            showUpdateAvailableDialog(release)
-        }
-    }
-
-    private fun showUpdateAvailableDialog(release: UpdateChecker.ReleaseInfo) {
-        MaterialAlertDialogBuilder(this)
-            .setTitle(getString(R.string.update_dialog_title))
-            .setMessage(release.notes.ifBlank { release.tagName })
-            .setPositiveButton(R.string.update_dialog_button_update) { _, _ ->
-                downloadAndInstall(release)
-            }
-            .setNeutralButton(R.string.update_dialog_button_skip) { _, _ ->
-                Prefs.setSkippedUpdateVersion(this, release.versionName)
-            }.setNegativeButton(R.string.update_dialog_button_later, null)
-            .show()
-    }
-
-    private fun downloadAndInstall(release: UpdateChecker.ReleaseInfo) {
-        if (!UpdateInstaller.canInstall(this)) {
-            Toast.makeText(
-                this,
-                R.string.update_toast_grant_install_permission,
-                Toast.LENGTH_LONG
-            ).show()
-            UpdateInstaller.requestInstallPermission(this)
-            return
-        }
-        val downloadManager = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
-        val request =
-            DownloadManager
-                .Request(Uri.parse(release.apkUrl))
-                .setTitle("Steam Controller ${release.versionName}")
-                .setDestinationInExternalFilesDir(
-                    this,
-                    Environment.DIRECTORY_DOWNLOADS,
-                    release.apkName
-                )
-                .setNotificationVisibility(
-                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
-                )
-
-        pendingUpdateApkFile =
-            File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), release.apkName)
-        pendingUpdateDownloadId = downloadManager.enqueue(request)
-        Toast.makeText(this, R.string.update_toast_downloading, Toast.LENGTH_SHORT).show()
     }
 
     private fun checkPermissionsAndStart() {
@@ -711,6 +543,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Select a paired Bluetooth device first", Toast.LENGTH_LONG).show()
             return
         }
+        Prefs.setUserStoppedService(this, false)
         val intent = Intent(this, ControllerService::class.java)
         startForegroundService(intent)
         serviceRunning = true
@@ -754,6 +587,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startControllerService(device: UsbDevice) {
+        Prefs.setUserStoppedService(this, false)
         val intent =
             Intent(this, ControllerService::class.java).apply {
                 putExtra(ControllerService.EXTRA_DEVICE, device)
@@ -778,14 +612,129 @@ class MainActivity : AppCompatActivity() {
         log("Service stopped")
     }
 
+    private fun handleStatusAction() {
+        if (!isShizukuInstalled()) {
+            openShizukuInstall()
+            return
+        }
+        val running = try {
+            Shizuku.pingBinder()
+        } catch (_: Throwable) {
+            false
+        }
+        when {
+            !running -> startShizukuService()
+
+            Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED ->
+                Shizuku.requestPermission(shizukuRequestCode)
+
+            else -> restartService()
+        }
+    }
+
+    private fun startShizukuService() {
+        if (!ShizukuStarterService.isEnabledInSettings(this)) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.shizuku_starter_prompt_title)
+                .setMessage(R.string.shizuku_starter_prompt_message)
+                .setPositiveButton(R.string.shizuku_starter_prompt_open_settings) { _, _ ->
+                    openAccessibilitySettings()
+                }
+                .setNeutralButton(R.string.shizuku_starter_prompt_open_shizuku) { _, _ ->
+                    openShizukuApp()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            return
+        }
+        Prefs.setUserStoppedService(this, false)
+        ShizukuStarterService.arm()
+        Toast.makeText(this, R.string.shizuku_starter_armed, Toast.LENGTH_SHORT).show()
+        openShizukuApp()
+    }
+
+    private fun openAccessibilitySettings() {
+        val direct = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        val resolvedPackage = direct.resolveActivity(packageManager)?.packageName
+        val target =
+            if (resolvedPackage != null && resolvedPackage != tvSettingsStubPackage) {
+                direct
+            } else {
+                Intent(Settings.ACTION_SETTINGS)
+            }
+        try {
+            startActivity(target)
+            if (target !== direct) {
+                Toast.makeText(this, R.string.shizuku_starter_settings_path, Toast.LENGTH_LONG)
+                    .show()
+            }
+        } catch (_: Throwable) {
+            Toast.makeText(this, R.string.shizuku_starter_settings_failed, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun openShizukuApp() {
+        val intent = packageManager.getLaunchIntentForPackage(shizukuPackage)
+        if (intent == null) {
+            Toast.makeText(this, R.string.main_shizuku_open_failed, Toast.LENGTH_LONG).show()
+            return
+        }
+        try {
+            startActivity(intent)
+        } catch (_: Throwable) {
+            Toast.makeText(this, R.string.main_shizuku_open_failed, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun isShizukuInstalled(): Boolean = try {
+        packageManager.getPackageInfo(shizukuPackage, 0)
+        true
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    } catch (_: Throwable) {
+        true
+    }
+
+    private fun openShizukuInstall() {
+        val targets =
+            listOf(
+                "market://details?id=$shizukuPackage",
+                "https://play.google.com/store/apps/details?id=$shizukuPackage",
+                "https://github.com/RikkaApps/Shizuku/releases/latest"
+            )
+        for (target in targets) {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
+                return
+            } catch (_: Throwable) {
+            }
+        }
+        Toast.makeText(this, R.string.main_shizuku_store_failed, Toast.LENGTH_LONG).show()
+    }
+
+    private fun hasShizukuAccess(): Boolean = try {
+        Shizuku.pingBinder() &&
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+    } catch (_: Throwable) {
+        false
+    }
+
     private fun updateShizukuStatus(ok: Boolean) {
         val transport = Prefs.getTransport(this).displayName
-        binding.tvShizukuStatus.text =
-            if (ok) {
-                "Shizuku: ready  •  $transport"
-            } else {
-                "Shizuku: not ready  •  $transport"
+        val prerequisite =
+            when {
+                ok -> "ready"
+                !isShizukuInstalled() -> "not installed — tap to install"
+                !shizukuRunning() -> "not running — tap to start"
+                else -> "permission required — tap to grant"
             }
+        binding.tvShizukuStatus.text = "Shizuku: $prerequisite  •  $transport"
+    }
+
+    private fun shizukuRunning(): Boolean = try {
+        Shizuku.pingBinder()
+    } catch (_: Throwable) {
+        false
     }
 
     /**
@@ -800,10 +749,16 @@ class MainActivity : AppCompatActivity() {
      * that is exactly what the old version showed. Only LINKED gets the connected styling.
      */
     private fun updateStatus() {
-        val status = ControllerService.serviceStateFlow.value.link
+        val serviceState = ControllerService.serviceStateFlow.value
+        val status = serviceState.link
         binding.tvControllerStatus.text =
             when (status.state) {
-                ControllerService.LinkState.LINKED -> getString(R.string.status_ready)
+                ControllerService.LinkState.LINKED ->
+                    if (serviceState.reportRateHz > 0) {
+                        "${getString(R.string.status_ready)} · ${serviceState.reportRateHz} Hz"
+                    } else {
+                        getString(R.string.status_ready)
+                    }
 
                 ControllerService.LinkState.STALE ->
                     getString(R.string.status_link_lost, status.detail)
@@ -830,7 +785,6 @@ class MainActivity : AppCompatActivity() {
                 ContextCompat.getColor(this, R.color.status_idle_on_container)
             }
 
-        // statusPillCard only exists in the phone layout; sw600dp/TV use a different layout.
         binding.statusPillCard?.setCardBackgroundColor(containerColor)
         binding.tvShizukuStatus.setTextColor(textColor)
     }
@@ -842,10 +796,18 @@ class MainActivity : AppCompatActivity() {
     private fun restartService() {
         log("Reconnecting…")
         Toast.makeText(this, R.string.reconnecting, Toast.LENGTH_SHORT).show()
+        if (serviceRunning && Prefs.getTransport(this) == Transport.BLUETOOTH) {
+            startService(
+                Intent(this, ControllerService::class.java).apply {
+                    action = ControllerService.ACTION_RECONNECT
+                }
+            )
+            return
+        }
         if (serviceRunning) {
             startService(
                 Intent(this, ControllerService::class.java).apply {
-                    action = ControllerService.ACTION_STOP
+                    action = ControllerService.ACTION_RESTART
                 }
             )
             serviceRunning = false
@@ -865,22 +827,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        updateShizukuStatus(
-            Shizuku.pingBinder() &&
-                Shizuku.checkSelfPermission() ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED
-        )
+        updateShizukuStatus(hasShizukuAccess())
 
         // Sync Control Mode toggle — profile may have changed from the notification while paused
         syncControlModeToggle(Prefs.getProfile(this))
-
-        maybeAutoCheckForUpdates()
     }
 
     override fun onDestroy() {
         Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
         unregisterReceiver(usbReceiver)
-        unregisterReceiver(downloadReceiver)
         super.onDestroy()
     }
 }

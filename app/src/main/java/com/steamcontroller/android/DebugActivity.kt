@@ -1,25 +1,25 @@
 package com.steamcontroller.android
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.steamcontroller.android.databinding.ActivityDebugBinding
 import com.steamcontroller.android.parser.Buttons
 import com.steamcontroller.android.parser.SteamControllerState
 import com.steamcontroller.android.service.ControllerService
+import com.steamcontroller.android.service.Diagnostics
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
 class DebugActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityDebugBinding
-
-    // ms timestamps for Hz calculation
-    private var lastReportTime = 0L
-    private var reportCount = 0
-    private var hzAccum = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,23 +28,50 @@ class DebugActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { finish() }
         binding.toolbar.setOnMenuItemClickListener { item ->
             if (item.itemId == R.id.action_log_to_file) {
-                Toast.makeText(this, "Log to File coming in V1.2.x", Toast.LENGTH_SHORT).show()
+                shareDiagnostics()
                 true
-            } else false
-        }
-
-        lifecycleScope.launch {
-            ControllerService.stateFlow.filterNotNull().collect { state ->
-                updateButtons(state)
-                updateAxes(state)
-                updateHz()
+            } else {
+                false
             }
         }
 
+        // Rendering every HID frame and formatting its raw bytes is useful only while visible.
         lifecycleScope.launch {
-            ControllerService.rawReportFlow.filterNotNull().collect { raw ->
-                binding.tvRawHex.text = formatHex(raw)
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    ControllerService.stateFlow.filterNotNull().collect { state ->
+                        updateButtons(state)
+                        updateAxes(state)
+                    }
+                }
+                launch {
+                    ControllerService.rawReportFlow.filterNotNull().collect { raw ->
+                        binding.tvRawHex.text = formatHex(raw)
+                    }
+                }
+                launch {
+                    ControllerService.serviceStateFlow.collect { state ->
+                        binding.tvReportRate.text = "${state.reportRateHz} Hz"
+                    }
+                }
             }
+        }
+    }
+
+    private fun shareDiagnostics() {
+        try {
+            val file = Diagnostics.export(this)
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            val intent =
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            startActivity(Intent.createChooser(intent, getString(R.string.menu_log_to_file)))
+        } catch (t: Throwable) {
+            Toast.makeText(this, "Could not export diagnostics: ${t.message}", Toast.LENGTH_LONG)
+                .show()
         }
     }
 
@@ -58,36 +85,36 @@ class DebugActivity : AppCompatActivity() {
         fun chip(tv: TextView, mask: Int, circular: Boolean = false) {
             val active = s.isButtonPressed(mask)
             val bg = when {
-                circular && active   -> R.drawable.chip_circle_bg_active
-                circular              -> R.drawable.chip_circle_bg
-                !circular && active   -> R.drawable.chip_bg_active
-                else                  -> R.drawable.chip_bg
+                circular && active -> R.drawable.chip_circle_bg_active
+                circular -> R.drawable.chip_circle_bg
+                !circular && active -> R.drawable.chip_bg_active
+                else -> R.drawable.chip_bg
             }
             tv.setBackgroundResource(bg)
             tv.setTextColor(getColor(if (active) android.R.color.black else R.color.chip_inactive))
         }
-        chip(binding.btnA,         Buttons.A,         circular = true)
-        chip(binding.btnB,         Buttons.B,         circular = true)
-        chip(binding.btnX,         Buttons.X,         circular = true)
-        chip(binding.btnY,         Buttons.Y,         circular = true)
-        chip(binding.btnLB,        Buttons.LB)
-        chip(binding.btnRB,        Buttons.RB)
-        chip(binding.btnSelect,    Buttons.VIEW)
-        chip(binding.btnSteam,     Buttons.STEAM)
-        chip(binding.btnStart,     Buttons.MENU)
-        chip(binding.btnQA,        Buttons.QUICK_ACCESS)
-        chip(binding.btnDU,        Buttons.DPAD_UP,    circular = true)
-        chip(binding.btnDD,        Buttons.DPAD_DOWN,  circular = true)
-        chip(binding.btnDL,        Buttons.DPAD_LEFT,  circular = true)
-        chip(binding.btnDR,        Buttons.DPAD_RIGHT, circular = true)
-        chip(binding.btnLS,        Buttons.LS,         circular = true)
-        chip(binding.btnRS,        Buttons.RS,         circular = true)
-        chip(binding.btnLGrip,     Buttons.GRIP_LT)
-        chip(binding.btnRGrip,     Buttons.GRIP_RT)
-        chip(binding.btnL4,        Buttons.L4)
-        chip(binding.btnL5,        Buttons.L5)
-        chip(binding.btnR4,        Buttons.R4)
-        chip(binding.btnR5,        Buttons.R5)
+        chip(binding.btnA, Buttons.A, circular = true)
+        chip(binding.btnB, Buttons.B, circular = true)
+        chip(binding.btnX, Buttons.X, circular = true)
+        chip(binding.btnY, Buttons.Y, circular = true)
+        chip(binding.btnLB, Buttons.LB)
+        chip(binding.btnRB, Buttons.RB)
+        chip(binding.btnSelect, Buttons.VIEW)
+        chip(binding.btnSteam, Buttons.STEAM)
+        chip(binding.btnStart, Buttons.MENU)
+        chip(binding.btnQA, Buttons.QUICK_ACCESS)
+        chip(binding.btnDU, Buttons.DPAD_UP, circular = true)
+        chip(binding.btnDD, Buttons.DPAD_DOWN, circular = true)
+        chip(binding.btnDL, Buttons.DPAD_LEFT, circular = true)
+        chip(binding.btnDR, Buttons.DPAD_RIGHT, circular = true)
+        chip(binding.btnLS, Buttons.LS, circular = true)
+        chip(binding.btnRS, Buttons.RS, circular = true)
+        chip(binding.btnLGrip, Buttons.GRIP_LT)
+        chip(binding.btnRGrip, Buttons.GRIP_RT)
+        chip(binding.btnL4, Buttons.L4)
+        chip(binding.btnL5, Buttons.L5)
+        chip(binding.btnR4, Buttons.R4)
+        chip(binding.btnR5, Buttons.R5)
     }
 
     private fun updateAxes(s: SteamControllerState) {
@@ -126,22 +153,6 @@ class DebugActivity : AppCompatActivity() {
         binding.tvQX.text = "qX: %5d".format(s.quatX.toInt())
         binding.tvQY.text = "qY: %5d".format(s.quatY.toInt())
         binding.tvQZ.text = "qZ: %5d".format(s.quatZ.toInt())
-    }
-
-    private fun updateHz() {
-        val now = System.currentTimeMillis()
-        if (lastReportTime != 0L) {
-            hzAccum += now - lastReportTime
-            reportCount++
-            if (reportCount >= 30) {
-                val avgMs = hzAccum / reportCount
-                val hz = if (avgMs > 0) 1000 / avgMs else 0
-                binding.tvReportRate.text = "$hz Hz"
-                reportCount = 0
-                hzAccum = 0
-            }
-        }
-        lastReportTime = now
     }
 
     private fun formatHex(buf: ByteArray): String {

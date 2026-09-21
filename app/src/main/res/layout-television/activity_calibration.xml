@@ -107,16 +107,37 @@
                         android:text="@string/calib_trackpad_switch_label_tv"
                         android:textColor="?attr/colorOnPrimaryContainer"
                         android:textSize="13sp" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchStartOnBoot"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/calib_start_on_boot"
+                        android:textColor="?attr/colorOnPrimaryContainer"
+                        android:textSize="13sp" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchStartOnConnect"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/calib_start_on_connect"
+                        android:textColor="?attr/colorOnPrimaryContainer"
+                        android:textSize="13sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ━━━━━━━━━━━━ RUMBLE ━━━━━━━━━━━━ -->
-            <com.google.android.material.card.MaterialCardView
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="12dp"
                 android:layout_weight="1"
-                app:cardCornerRadius="18dp"
+                android:orientation="vertical">
+
+                <!-- ━━━━━━━━━━━━ RUMBLE ━━━━━━━━━━━━ -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardCornerRadius="18dp"
                 app:cardElevation="0dp"
                 app:strokeColor="?attr/colorOutlineVariant"
                 app:strokeWidth="1dp">
@@ -173,7 +194,15 @@
                         android:text="@string/calib_test_rumble"
                         app:cornerRadius="14dp" />
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+                </com.google.android.material.card.MaterialCardView>
+
+                <include
+                    android:id="@+id/gyroControls"
+                    layout="@layout/include_gyro_controls"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp" />
+            </LinearLayout>
 
             <!-- ━━━━━━━━━━━━ STICKS ━━━━━━━━━━━━ -->
             <com.google.android.material.card.MaterialCardView

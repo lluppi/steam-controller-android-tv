@@ -48,15 +48,6 @@
                 android:textStyle="bold" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnCheckUpdate"
-                style="@style/Widget.Material3.Button.IconButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:contentDescription="@string/main_check_update_desc"
-                app:icon="@drawable/ic_update"
-                app:iconTint="?attr/colorOnSurfaceVariant" />
-
-            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnGithub"
                 style="@style/Widget.Material3.Button.IconButton"
                 android:layout_width="wrap_content"
@@ -92,9 +83,13 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+            android:clickable="true"
+            android:focusable="true"
             app:cardBackgroundColor="@color/status_idle_container"
             app:cardCornerRadius="14dp"
-            app:cardElevation="0dp">
+            app:cardElevation="0dp"
+            app:strokeColor="@color/focusable_card_stroke"
+            app:strokeWidth="3dp">
 
             <TextView
                 android:id="@+id/tvShizukuStatus"
@@ -257,88 +252,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ━━━━━━━━━━━━ Gamepad variant (visible only in Gamepad mode) ━━━━━━━━━━━━ -->
-        <LinearLayout
-            android:id="@+id/gamepadVariantSection"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginBottom="6dp"
-                android:letterSpacing="0.1"
-                android:text="@string/main_emulated_controller_label"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp" />
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardCornerRadius="14dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="10dp">
-
-                    <RadioGroup
-                        android:id="@+id/radioGroupGamepadRow1"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.radiobutton.MaterialRadioButton
-                            android:id="@+id/rbXbox360"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/main_gamepad_xbox360"
-                            android:textSize="13sp" />
-
-                        <com.google.android.material.radiobutton.MaterialRadioButton
-                            android:id="@+id/rbXboxOne"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/main_gamepad_xboxone"
-                            android:textSize="13sp" />
-                    </RadioGroup>
-
-                    <RadioGroup
-                        android:id="@+id/radioGroupGamepadRow2"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.radiobutton.MaterialRadioButton
-                            android:id="@+id/rbDualShock4"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/main_gamepad_ds4"
-                            android:textSize="13sp" />
-
-                        <com.google.android.material.radiobutton.MaterialRadioButton
-                            android:id="@+id/rbDualSense"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/main_gamepad_dualsense"
-                            android:textSize="13sp" />
-                    </RadioGroup>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-        </LinearLayout>
-
         <!-- ━━━━━━━━━━━━ BT device picker (visible only when transport=BT) ━━━━━━━━━━━━ -->
         <!-- Placed right above Start so the user picks the device as the final step
              before launching the service. Visibility toggled by Kotlin. -->
@@ -385,7 +298,10 @@
             android:layout_marginTop="14dp"
             android:textSize="17sp"
             android:textStyle="bold"
+            app:backgroundTint="@color/btn_service_bg"
             app:cornerRadius="20dp"
+            app:strokeColor="@color/btn_service_stroke"
+            app:strokeWidth="3dp"
             android:text="@string/btn_start" />
 
         <!-- ━━━━━━━━━━━━ Action cards ━━━━━━━━━━━━ -->
@@ -398,8 +314,8 @@
             android:focusable="true"
             app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeColor="@color/focusable_card_stroke"
+            app:strokeWidth="3dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -458,8 +374,8 @@
             android:focusable="true"
             app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeColor="@color/focusable_card_stroke"
+            app:strokeWidth="3dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -518,8 +434,8 @@
             android:focusable="true"
             app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeColor="@color/focusable_card_stroke"
+            app:strokeWidth="3dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -578,8 +494,8 @@
             android:focusable="true"
             app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeColor="@color/focusable_card_stroke"
+            app:strokeWidth="3dp">
 
             <LinearLayout
                 android:layout_width="match_parent"

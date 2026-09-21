@@ -7,7 +7,10 @@ import android.os.IBinder
 import android.util.Log
 import com.steamcontroller.android.BuildConfig
 import com.steamcontroller.android.Prefs
-import com.steamcontroller.android.input.DEFAULT_MOUSE_MAPPING
+import com.steamcontroller.android.input.DEFAULT_ACTION_LAYER
+import com.steamcontroller.android.input.GyroActivation
+import com.steamcontroller.android.input.GyroAim
+import com.steamcontroller.android.input.GyroTuning
 import com.steamcontroller.android.input.MOUSE_LEFT_PAD_CLICK_BIT
 import com.steamcontroller.android.input.MOUSE_MODE_FIXED_DPAD
 import com.steamcontroller.android.input.MOUSE_RIGHT_PAD_CLICK_BIT
@@ -32,6 +35,27 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         // returns "null" as a string in that case) — restored by deleting the key, not by
         // writing the literal string "null".
         private const val SHOW_IME_UNSET_SENTINEL = "__unset__"
+        private const val ACTION_LAYER_HOLD_MS = 250L
+        private const val TRIGGER_PRESS_THRESHOLD = 30_000
+        private const val TRIGGER_RELEASE_THRESHOLD = 28_500
+        private const val TRIGGER_DEBOUNCE_MS = 12L
+    }
+
+    private class AnalogButtonDebouncer {
+        private var pressed = false
+        private var candidate = false
+        private var candidateSinceMs = 0L
+
+        fun update(value: Int, nowMs: Long): Boolean {
+            val next = value >= if (pressed) TRIGGER_RELEASE_THRESHOLD else TRIGGER_PRESS_THRESHOLD
+            if (next != candidate) {
+                candidate = next
+                candidateSinceMs = nowMs
+            } else if (candidate != pressed && nowMs - candidateSinceMs >= TRIGGER_DEBOUNCE_MS) {
+                pressed = candidate
+            }
+            return pressed
+        }
     }
 
     private var service: IUInputService? = null
@@ -91,12 +115,19 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
 
     @Volatile private var cachedMapping: Map<SteamButton, XboxTarget> = emptyMap()
 
+    @Volatile private var cachedDesktopMapping: Map<SteamButton, XboxTarget> = emptyMap()
+
     @Volatile private var lastCalRefresh: Long = 0
     private val calRefreshIntervalMs = 250L // ~4 Hz refresh, plenty for live tuning
 
-    // Edge detection for special actions (screenshot etc.): we track the previous frame's
-    // raw button bits so we can fire on 0 → 1 transitions only (not while held).
-    private var lastFrameButtons: Int = 0
+    // Edge detection uses source bits rather than the raw report because trigger mappings are
+    // derived from analog values and do not have trustworthy digital bits on this firmware.
+    private var lastSourceButtons: Long = 0L
+    private var layerPressedAt = 0L
+    private var layerWasPressed = false
+    private var guideTapPending = false
+    private val leftTriggerButton = AnalogButtonDebouncer()
+    private val rightTriggerButton = AnalogButtonDebouncer()
 
     // Mouse-mode state: previous trackpad position (for delta) and sensitivity cache.
     private var lastRightPadX: Int = 0
@@ -108,6 +139,16 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     private var leftPadHadContact: Boolean = false
 
     @Volatile private var cachedMouseSensitivity: Float = 1f
+
+    private val gyro = GyroAim()
+
+    @Volatile private var cachedGyroEnabled = false
+
+    @Volatile private var cachedGyroTuning = GyroTuning()
+
+    @Volatile private var cachedGyroActivation = GyroActivation.RIGHT_PAD_TOUCH
+
+    @Volatile private var cachedGyroInvertY = false
 
     @Volatile private var cachedTrackpadAsMouse: Boolean = true
 
@@ -332,8 +373,13 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
             cachedLeftCal = Prefs.getLeftCalibration(context)
             cachedRightCal = Prefs.getRightCalibration(context)
             cachedMapping = Prefs.getAllMappings(context)
+            cachedDesktopMapping = Prefs.getAllDesktopMappings(context)
             cachedMouseSensitivity = Prefs.getMouseSensitivity(context)
             cachedTrackpadAsMouse = Prefs.getTrackpadAsMouseInGamepad(context)
+            cachedGyroEnabled = Prefs.getGyroEnabled(context)
+            cachedGyroTuning = Prefs.getGyroTuning(context)
+            cachedGyroActivation = Prefs.getGyroActivation(context)
+            cachedGyroInvertY = Prefs.getGyroInvertY(context)
             lastCalRefresh = now
         }
 
@@ -354,8 +400,26 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         var sidecarMappedKeys = 0
         var ltOverride = 0
         var rtOverride = 0
-        for ((source, target) in cachedMapping) {
-            val pressed = state.isButtonPressed(source.mask)
+        val sourceButtons = sourceButtons(state)
+        val layerSource = cachedMapping.entries.firstOrNull { it.value == XboxTarget.GUIDE_LAYER }
+        val layerPressed =
+            layerSource?.let { sourceButtons and (1L shl it.key.ordinal) != 0L } == true
+        if (layerPressed && !layerWasPressed) layerPressedAt = now
+        if (!layerPressed && layerWasPressed && now - layerPressedAt < ACTION_LAYER_HOLD_MS) {
+            guideTapPending = true
+        }
+        val layerActive = layerPressed && now - layerPressedAt >= ACTION_LAYER_HOLD_MS
+        layerWasPressed = layerPressed
+        if (guideTapPending) {
+            xboxButtons = xboxButtons or XboxTarget.MODE.mask
+            guideTapPending = false
+        }
+
+        for ((source, baseTarget) in cachedMapping) {
+            if (baseTarget == XboxTarget.GUIDE_LAYER) continue
+            val target = if (layerActive) DEFAULT_ACTION_LAYER[source] ?: baseTarget else baseTarget
+            val sourceBit = 1L shl source.ordinal
+            val pressed = sourceButtons and sourceBit != 0L
             when {
                 target.mask > 0 && pressed -> {
                     xboxButtons = xboxButtons or target.mask
@@ -374,12 +438,12 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
                 }
 
                 target.mask < 0 && target.keyBit < 0 && target.triggerSide == 0 -> {
-                    val wasPressed = (lastFrameButtons and source.mask) != 0
+                    val wasPressed = lastSourceButtons and sourceBit != 0L
                     if (pressed && !wasPressed) handleSpecialAction(target)
                 }
             }
         }
-        lastFrameButtons = state.buttons
+        lastSourceButtons = sourceButtons
 
         // SC2026 sticks are already in Int16 range — direct passthrough
         // SC2026 triggers are 0-32767 → scale down to Xbox 0-255.
@@ -406,14 +470,36 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
 
         // SC2026 reports Y positive = up; Linux input ABS_Y convention is Y positive = down.
         val ly = -lyCalRaw.coerceAtLeast(-32767)
-        val ry = -ryCalRaw.coerceAtLeast(-32767)
+        var rx = rxCal
+        var ry = -ryCalRaw.coerceAtLeast(-32767)
+
+        if (cachedGyroEnabled) {
+            val activation = cachedGyroActivation
+            if (activation.mask == 0 || state.isButtonPressed(activation.mask)) {
+                gyro.update(
+                    state.quatW,
+                    state.quatX,
+                    state.quatY,
+                    state.quatZ,
+                    now,
+                    cachedGyroTuning
+                )
+                rx = (rx + gyro.stickX).coerceIn(-32767, 32767)
+                val gyroY = if (cachedGyroInvertY) -gyro.stickY else gyro.stickY
+                ry = (ry + gyroY).coerceIn(-32767, 32767)
+            } else {
+                gyro.reset()
+            }
+        } else {
+            gyro.reset()
+        }
 
         try {
             svc.sendFrame(
                 xboxButtons,
                 lxCal,
                 ly,
-                rxCal,
+                rx,
                 ry,
                 lt,
                 rt,
@@ -549,6 +635,21 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     }
 
     /** Left trackpad vertical → wheel ticks. One tick per ~1000 accumulator units. */
+    private fun sourceButtons(state: SteamControllerState): Long {
+        val now = android.os.SystemClock.uptimeMillis()
+        var pressed = 0L
+        SteamButton.values().forEach { source ->
+            val isPressed =
+                when (source) {
+                    SteamButton.LT -> leftTriggerButton.update(state.leftTrigger, now)
+                    SteamButton.RT -> rightTriggerButton.update(state.rightTrigger, now)
+                    else -> source.isPressed(state)
+                }
+            if (isPressed) pressed = pressed or (1L shl source.ordinal)
+        }
+        return pressed
+    }
+
     private fun computeLeftPadScroll(state: SteamControllerState): Int {
         val touching = state.isButtonPressed(Buttons.TP_LT)
         val curY = state.leftPadY.toInt()
@@ -586,10 +687,13 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         // ── Key/mouse-button bitmask ─────────────────────────────────────────
         var keys = 0
 
-        // Customisable face/system mapping (uses MOUSE-mode defaults, no Prefs persistence in V1.1).
-        for ((source, target) in DEFAULT_MOUSE_MAPPING) {
-            if (target.bit >= 0 && state.isButtonPressed(source.mask)) {
-                keys = keys or (1 shl target.bit)
+        val sourceButtons = sourceButtons(state)
+
+        // Desktop actions use the same persisted target IDs as gamepad mode, filtered to
+        // keyboard and pointer actions by keyBit.
+        for ((source, target) in cachedDesktopMapping) {
+            if (target.keyBit >= 0 && sourceButtons and (1L shl source.ordinal) != 0L) {
+                keys = keys or (1 shl target.keyBit)
             }
         }
 
@@ -605,14 +709,15 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
 
         // Special actions (screenshot) still honoured via the gamepad mapping table —
         // keeps QA → screenshot working even in mouse mode.
-        for ((source, target) in cachedMapping) {
-            if (target.mask < 0) {
-                val pressed = state.isButtonPressed(source.mask)
-                val wasPressed = (lastFrameButtons and source.mask) != 0
+        for ((source, target) in cachedDesktopMapping) {
+            if (target.mask < 0 && target.keyBit < 0 && target.triggerSide == 0) {
+                val sourceBit = 1L shl source.ordinal
+                val pressed = sourceButtons and sourceBit != 0L
+                val wasPressed = lastSourceButtons and sourceBit != 0L
                 if (pressed && !wasPressed) handleSpecialAction(target)
             }
         }
-        lastFrameButtons = state.buttons
+        lastSourceButtons = sourceButtons
 
         // Same "nothing changed → don't send" rule as the gamepad-mode sidecar: a frame
         // that keeps the mouse node reporting makes Android hold the cursor active and

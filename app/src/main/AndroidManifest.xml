@@ -12,15 +12,12 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Start the controller service at boot (see BootReceiver). Shizuku still has to be
-         restarted by hand after a reboot: Android 9 has no wireless-debugging pairing. -->
+    <!-- Start the controller service at boot or when its Bluetooth controller connects.
+         Shizuku must be running before either background start can create a virtual device. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- Update checker: fetch latest GitHub release + download/install the signed APK. -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Android 12+ runtime permissions -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
@@ -30,6 +27,7 @@
     <!-- Legacy (Android 11 and below) -->
     <uses-permission android:name="android.permission.BLUETOOTH"        android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"  android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
 
     <!-- Auto-switch profile when the foreground app changes (V1.2 Phase 2b).
@@ -53,8 +51,8 @@
         android:allowBackup="true"
         android:banner="@drawable/tv_banner"
         android:icon="@mipmap/ic_launcher"
-        android:label="Steam Controller"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.SteamController">
 
@@ -102,11 +100,14 @@
             android:parentActivityName=".ProfilesActivity" />
 
         <receiver
-            android:name=".service.BootReceiver"
+            android:name=".service.AutoStartReceiver"
             android:enabled="true"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
             </intent-filter>
         </receiver>
 
@@ -114,6 +115,19 @@
             android:name=".service.ControllerService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <service
+            android:name=".shizuku.ShizukuStarterService"
+            android:exported="false"
+            android:label="@string/shizuku_starter_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/shizuku_starter_service" />
+        </service>
 
         <provider
             android:name="rikka.shizuku.ShizukuProvider"

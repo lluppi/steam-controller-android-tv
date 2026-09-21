@@ -2,11 +2,14 @@ package com.steamcontroller.android
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.slider.Slider
 import com.steamcontroller.android.databinding.ActivityCalibrationBinding
+import com.steamcontroller.android.input.GyroActivation
+import com.steamcontroller.android.input.GyroAim
 import com.steamcontroller.android.input.StickCalibration
 import com.steamcontroller.android.service.ControllerService
 import kotlinx.coroutines.flow.filterNotNull
@@ -22,6 +25,7 @@ class CalibrationActivity : AppCompatActivity() {
 
     private var leftCal = StickCalibration()
     private var rightCal = StickCalibration()
+    private var gyroCalibrator: GyroAim? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,13 +46,13 @@ class CalibrationActivity : AppCompatActivity() {
         rightCal = Prefs.getRightCalibration(this)
         bindUiFromState()
 
-        // Rumble needs force feedback from the virtual device. Only the uinput backend
-        // implements it (hid-generic provides none for the uhid descriptors), so rather than
-        // offer a control that cannot do anything, disable it and say why.
+        // Manual haptic tests go directly to the physical controller on either transport.
+        // Game-driven force feedback still depends on the selected virtual-device backend.
         lifecycleScope.launch {
             ControllerService.serviceStateFlow.collect { state ->
-                binding.btnTestRumble.isEnabled = state.rumbleSupported
-                binding.sliderRumbleIntensity.isEnabled = state.rumbleSupported
+                val running = state.mode != ControllerService.InjectionMode.NONE
+                binding.btnTestRumble.isEnabled = running
+                binding.sliderRumbleIntensity.isEnabled = running
                 binding.btnTestRumble.text =
                     if (state.rumbleSupported) {
                         getString(R.string.calib_test_rumble)
@@ -95,12 +99,96 @@ class CalibrationActivity : AppCompatActivity() {
             }
         )
 
-        // Trackpads-as-mouse toggle (active alongside Xbox/PS profiles only).
+        // Trackpads-as-mouse toggle for gamepad mode.
         // UInputGamepad re-reads the pref at most every 250ms so flipping it is
         // effectively live without restarting the service.
         binding.switchTrackpadAsMouse.isChecked = Prefs.getTrackpadAsMouseInGamepad(this)
         binding.switchTrackpadAsMouse.setOnCheckedChangeListener { _, checked ->
             Prefs.setTrackpadAsMouseInGamepad(this, checked)
+        }
+
+        binding.switchStartOnBoot.isChecked = Prefs.getStartOnBoot(this)
+        binding.switchStartOnBoot.setOnCheckedChangeListener { _, checked ->
+            Prefs.setStartOnBoot(this, checked)
+        }
+        binding.switchStartOnConnect.isChecked = Prefs.getStartOnControllerConnect(this)
+        binding.switchStartOnConnect.setOnCheckedChangeListener { _, checked ->
+            Prefs.setStartOnControllerConnect(this, checked)
+        }
+
+        val gyroControls = binding.gyroControls
+        gyroControls.switchGyroEnabled.isChecked = Prefs.getGyroEnabled(this)
+        gyroControls.switchGyroEnabled.setOnCheckedChangeListener { _, checked ->
+            Prefs.setGyroEnabled(this, checked)
+        }
+        val gyroSensitivity = Prefs.getGyroSensitivity(this)
+        gyroControls.sliderGyroSensitivity.value = gyroSensitivity
+        gyroControls.tvGyroSensitivity.text = "%.1f× horizontal".format(gyroSensitivity)
+        gyroControls.sliderGyroSensitivity.addOnChangeListener(
+            Slider.OnChangeListener { _, value, _ ->
+                gyroControls.tvGyroSensitivity.text = "%.1f× horizontal".format(value)
+                Prefs.setGyroSensitivity(this, value)
+            }
+        )
+        val gyroSensitivityY = Prefs.getGyroSensitivityY(this)
+        gyroControls.sliderGyroSensitivityY.value = gyroSensitivityY
+        gyroControls.tvGyroSensitivityY.text = "%.1f× vertical".format(gyroSensitivityY)
+        gyroControls.sliderGyroSensitivityY.addOnChangeListener(
+            Slider.OnChangeListener { _, value, _ ->
+                gyroControls.tvGyroSensitivityY.text = "%.1f× vertical".format(value)
+                Prefs.setGyroSensitivityY(this, value)
+            }
+        )
+        val gyroSmoothing = Prefs.getGyroSmoothing(this)
+        gyroControls.sliderGyroSmoothing.value = gyroSmoothing
+        gyroControls.tvGyroSmoothing.text = "%.0f%% smoothing".format(gyroSmoothing * 100f)
+        gyroControls.sliderGyroSmoothing.addOnChangeListener(
+            Slider.OnChangeListener { _, value, _ ->
+                gyroControls.tvGyroSmoothing.text = "%.0f%% smoothing".format(value * 100f)
+                Prefs.setGyroSmoothing(this, value)
+            }
+        )
+        val gyroDeadzone = Prefs.getGyroDeadzone(this)
+        gyroControls.sliderGyroDeadzone.value = gyroDeadzone
+        gyroControls.tvGyroDeadzone.text = "%.3f rad/s deadzone".format(gyroDeadzone)
+        gyroControls.sliderGyroDeadzone.addOnChangeListener(
+            Slider.OnChangeListener { _, value, _ ->
+                gyroControls.tvGyroDeadzone.text = "%.3f rad/s deadzone".format(value)
+                Prefs.setGyroDeadzone(this, value)
+            }
+        )
+        val gyroResponse = Prefs.getGyroResponse(this)
+        gyroControls.sliderGyroResponse.value = gyroResponse
+        gyroControls.tvGyroResponse.text = "%.1f response".format(gyroResponse)
+        gyroControls.sliderGyroResponse.addOnChangeListener(
+            Slider.OnChangeListener { _, value, _ ->
+                gyroControls.tvGyroResponse.text = "%.1f response".format(value)
+                Prefs.setGyroResponse(this, value)
+            }
+        )
+        gyroControls.btnGyroCalibrate.setOnClickListener {
+            if (ControllerService.stateFlow.value == null) {
+                Toast.makeText(this, "Start the service first", Toast.LENGTH_SHORT).show()
+            } else {
+                gyroCalibrator = GyroAim()
+                gyroControls.btnGyroCalibrate.text = getString(R.string.calib_gyro_calibrating)
+            }
+        }
+        gyroControls.switchGyroInvertY.isChecked = Prefs.getGyroInvertY(this)
+        gyroControls.switchGyroInvertY.setOnCheckedChangeListener { _, checked ->
+            Prefs.setGyroInvertY(this, checked)
+        }
+        fun renderGyroActivation() {
+            val activation = Prefs.getGyroActivation(this)
+            gyroControls.btnGyroActivation.text =
+                getString(R.string.calib_gyro_activation) + ": " + activation.displayName
+        }
+        renderGyroActivation()
+        gyroControls.btnGyroActivation.setOnClickListener {
+            val current = Prefs.getGyroActivation(this)
+            val next = GyroActivation.ALL[(current.ordinal + 1) % GyroActivation.ALL.size]
+            Prefs.setGyroActivation(this, next)
+            renderGyroActivation()
         }
 
         // Live preview from the running service
@@ -110,6 +198,24 @@ class CalibrationActivity : AppCompatActivity() {
                 lastLeftRawY = state.leftJoyY.toInt()
                 lastRightRawX = state.rightJoyX.toInt()
                 lastRightRawY = state.rightJoyY.toInt()
+
+                gyroCalibrator?.calibrate(
+                    state.quatW,
+                    state.quatX,
+                    state.quatY,
+                    state.quatZ,
+                    SystemClock.uptimeMillis()
+                )?.let { (biasX, biasY) ->
+                    Prefs.setGyroBias(this@CalibrationActivity, biasX, biasY)
+                    gyroCalibrator = null
+                    binding.gyroControls.btnGyroCalibrate.text =
+                        getString(R.string.calib_gyro_calibrate)
+                    Toast.makeText(
+                        this@CalibrationActivity,
+                        R.string.calib_gyro_calibrated,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
 
                 val (lx, ly) = leftCal.apply(lastLeftRawX, lastLeftRawY)
                 val (rx, ry) = rightCal.apply(lastRightRawX, lastRightRawY)

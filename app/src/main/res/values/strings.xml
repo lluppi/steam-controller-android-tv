@@ -25,7 +25,6 @@
     <string name="main_subtitle_tv">for Android TV via Shizuku</string>
     <string name="main_open_github_desc">Open GitHub repository</string>
     <string name="main_help_desc">Help: switching connection modes</string>
-    <string name="main_check_update_desc">Check for updates</string>
     <string name="main_shizuku_checking">Shizuku: checking…</string>
     <string name="main_transport_usb">USB / Puck</string>
     <string name="main_transport_bt">Bluetooth</string>
@@ -36,11 +35,6 @@
     <string name="main_control_mode_label">Control Mode</string>
     <string name="main_mode_gamepad">Gamepad</string>
     <string name="main_mode_desktop">Desktop</string>
-    <string name="main_emulated_controller_label">Emulated controller</string>
-    <string name="main_gamepad_xbox360">Xbox 360</string>
-    <string name="main_gamepad_xboxone">Xbox One</string>
-    <string name="main_gamepad_ds4">DualShock 4</string>
-    <string name="main_gamepad_dualsense">DualSense</string>
     <string name="main_bt_device_hint">Bluetooth device</string>
     <string name="main_refresh_bt_desc">Refresh paired devices</string>
     <string name="main_action_calibration_title">Calibration</string>
@@ -52,16 +46,22 @@
     <string name="main_action_debug_desc">View low-level HID reports</string>
     <string name="main_connection_label">CONNECTION</string>
 
-    <!-- ━━━━━━━━━━━━ Update checker ━━━━━━━━━━━━ -->
-    <string name="update_dialog_title">Update available</string>
-    <string name="update_dialog_button_update">Update</string>
-    <string name="update_dialog_button_skip">Skip this version</string>
-    <string name="update_dialog_button_later">Later</string>
-    <string name="update_toast_up_to_date">You\'re up to date (%1$s)</string>
-    <string name="update_toast_check_failed">Could not check for updates</string>
-    <string name="update_disabled">Updates are disabled in this build</string>
-    <string name="update_toast_downloading">Downloading update…</string>
-    <string name="update_toast_grant_install_permission">Allow installing from this app on the next screen, then tap Update again</string>
+    <!-- ━━━━━━━━━━━━ Shizuku TV startup ━━━━━━━━━━━━ -->
+    <string name="main_shizuku_open_failed">Could not open Shizuku.</string>
+    <string name="main_shizuku_store_failed">Could not open a store. Install Shizuku manually from GitHub.</string>
+    <string name="shizuku_starter_service_label">Steam Controller — Shizuku starter</string>
+    <string name="shizuku_starter_service_summary">Presses Shizuku\'s Start button so a TV remote is enough.</string>
+    <string name="shizuku_starter_service_description">Shizuku\'s Start button cannot receive D-pad focus on Android TV. This helper sees only Shizuku and acts only briefly after you request it.</string>
+    <string name="shizuku_starter_prompt_title">Let the app press Start for you</string>
+    <string name="shizuku_starter_prompt_message">Shizuku\'s Start button cannot be selected with a TV remote. Enable “Steam Controller — Shizuku starter” under Accessibility and this app will press it for you. It is restricted to Shizuku and only acts after you ask it to.</string>
+    <string name="shizuku_starter_prompt_open_settings">Open Accessibility settings</string>
+    <string name="shizuku_starter_prompt_open_shizuku">Just open Shizuku</string>
+    <string name="shizuku_starter_armed">Opening Shizuku and pressing Start…</string>
+    <string name="shizuku_starter_settings_failed">Could not open Accessibility settings.</string>
+    <string name="shizuku_starter_settings_path">Go to Device Preferences → Accessibility → Steam Controller — Shizuku starter</string>
+    <string name="autostart_channel_name">Controller auto-start</string>
+    <string name="autostart_shizuku_advisory_title">Controller auto-start needs Shizuku</string>
+    <string name="autostart_shizuku_advisory_text">Start Shizuku, then open Steam Controller to restore controller input.</string>
 
     <!-- ━━━━━━━━━━━━ CalibrationActivity ━━━━━━━━━━━━ -->
     <string name="calib_title">Calibration</string>
@@ -77,12 +77,26 @@
     <string name="calib_test_intensity">Test intensity</string>
     <string name="calib_intensity">Intensity</string>
     <string name="calib_test_rumble">Test rumble</string>
-    <string name="calib_rumble_unsupported">Rumble unavailable (needs uinput)</string>
+    <string name="calib_rumble_unsupported">Test haptics (game rumble unavailable)</string>
+    <string name="calib_gyro_header">GYRO AIMING</string>
+    <string name="calib_gyro_enable">Enable gyro aiming</string>
+    <string name="calib_gyro_sensitivity">Horizontal sensitivity</string>
+    <string name="calib_gyro_sensitivity_y">Vertical sensitivity</string>
+    <string name="calib_gyro_smoothing">Smoothing</string>
+    <string name="calib_gyro_deadzone">Noise deadzone</string>
+    <string name="calib_gyro_response">Response curve</string>
+    <string name="calib_gyro_calibrate">Calibrate gyro bias</string>
+    <string name="calib_gyro_calibrating">Keep the controller still…</string>
+    <string name="calib_gyro_calibrated">Gyro bias calibrated</string>
+    <string name="calib_gyro_invert_y">Invert gyro Y</string>
+    <string name="calib_gyro_activation">Activation</string>
     <string name="calib_desktop_header">DESKTOP MODE</string>
     <string name="calib_mouse_sensitivity">Mouse sensitivity</string>
-    <string name="calib_trackpad_switch_label">Trackpads as mouse in Xbox/PS profiles</string>
-    <string name="calib_trackpad_switch_label_tv">Trackpads as mouse (Xbox/PS)</string>
+    <string name="calib_trackpad_switch_label">Trackpads as mouse in gamepad mode</string>
+    <string name="calib_trackpad_switch_label_tv">Trackpads as mouse (gamepad)</string>
     <string name="calib_trackpad_hint">When ON, the right trackpad drives a cursor and the left one scrolls — alongside the gamepad.</string>
+    <string name="calib_start_on_boot">Start service after device boot</string>
+    <string name="calib_start_on_connect">Start when controller connects</string>
     <string name="calib_slider_left_deadzone_desc">Left stick deadzone</string>
     <string name="calib_slider_right_deadzone_desc">Right stick deadzone</string>
     <string name="calib_slider_rumble_intensity_desc">Rumble intensity</string>

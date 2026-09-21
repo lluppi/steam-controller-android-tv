@@ -1,6 +1,7 @@
 package com.steamcontroller.android.uinput
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import java.util.concurrent.atomic.AtomicLong
 
@@ -43,7 +44,7 @@ class UInputService : IUInputService.Stub {
     // The app polls us continuously while it is alive (the rumble poll runs at 50 Hz), so silence
     // for a while means the client is gone and we should exit. The app recovers: it notices the
     // binder death and re-binds on the next start.
-    private val lastCallAt = AtomicLong(System.currentTimeMillis())
+    private val lastCallAt = AtomicLong(SystemClock.uptimeMillis())
 
     // Starts after lastCallAt is initialised (property and init order is declaration order), and
     // covers both constructors: Shizuku may use either.
@@ -58,7 +59,7 @@ class UInputService : IUInputService.Stub {
                     while (true) {
                         try {
                             Thread.sleep(WATCHDOG_TICK_MS)
-                            val idle = System.currentTimeMillis() - lastCallAt.get()
+                            val idle = SystemClock.uptimeMillis() - lastCallAt.get()
                             if (idle > CLIENT_IDLE_TIMEOUT_MS) {
                                 Log.i(
                                     TAG,
@@ -82,39 +83,58 @@ class UInputService : IUInputService.Stub {
         thread.start()
     }
 
-    override fun selectBackend(preferred: Int): Int = try {
-        UInputNative.selectBackend(preferred)
-    } catch (t: Throwable) {
-        Log.e(TAG, "selectBackend failed: ${t.message}")
-        UInputNative.Backend.NONE
+    private fun touch() {
+        lastCallAt.set(SystemClock.uptimeMillis())
     }
 
-    override fun getBackend(): Int = try {
-        UInputNative.currentBackend()
-    } catch (t: Throwable) {
-        Log.e(TAG, "getBackend failed: ${t.message}")
-        UInputNative.Backend.NONE
+    override fun selectBackend(preferred: Int): Int {
+        touch()
+        return try {
+            UInputNative.selectBackend(preferred)
+        } catch (t: Throwable) {
+            Log.e(TAG, "selectBackend failed: ${t.message}")
+            UInputNative.Backend.NONE
+        }
     }
 
-    override fun getBackendDetail(): String = try {
-        UInputNative.backendDetail()
-    } catch (t: Throwable) {
-        Log.e(TAG, "getBackendDetail failed: ${t.message}")
-        "unavailable: ${t.message}"
+    override fun getBackend(): Int {
+        touch()
+        return try {
+            UInputNative.currentBackend()
+        } catch (t: Throwable) {
+            Log.e(TAG, "getBackend failed: ${t.message}")
+            UInputNative.Backend.NONE
+        }
     }
 
-    override fun supportsRumble(): Boolean = try {
-        UInputNative.supportsRumble()
-    } catch (t: Throwable) {
-        Log.e(TAG, "supportsRumble failed: ${t.message}")
-        false
+    override fun getBackendDetail(): String {
+        touch()
+        return try {
+            UInputNative.backendDetail()
+        } catch (t: Throwable) {
+            Log.e(TAG, "getBackendDetail failed: ${t.message}")
+            "unavailable: ${t.message}"
+        }
     }
 
-    override fun createGamepad(profileId: Int): Boolean = try {
-        UInputNative.createDevice(profileId)
-    } catch (t: Throwable) {
-        Log.e(TAG, "createDevice failed: ${t.message}")
-        false
+    override fun supportsRumble(): Boolean {
+        touch()
+        return try {
+            UInputNative.supportsRumble()
+        } catch (t: Throwable) {
+            Log.e(TAG, "supportsRumble failed: ${t.message}")
+            false
+        }
+    }
+
+    override fun createGamepad(profileId: Int): Boolean {
+        touch()
+        return try {
+            UInputNative.createDevice(profileId)
+        } catch (t: Throwable) {
+            Log.e(TAG, "createDevice failed: ${t.message}")
+            false
+        }
     }
 
     override fun sendFrame(
@@ -128,7 +148,7 @@ class UInputService : IUInputService.Stub {
         dpadX: Int,
         dpadY: Int
     ) {
-        lastCallAt.set(System.currentTimeMillis())
+        touch()
         try {
             UInputNative.sendFrame(
                 buttons,
@@ -147,7 +167,7 @@ class UInputService : IUInputService.Stub {
     }
 
     override fun sendMouseFrame(relX: Int, relY: Int, scrollY: Int, keys: Int) {
-        lastCallAt.set(System.currentTimeMillis())
+        touch()
         try {
             UInputNative.sendMouseFrame(relX, relY, scrollY, keys)
         } catch (t: Throwable) {
@@ -157,7 +177,7 @@ class UInputService : IUInputService.Stub {
 
     override fun pollForceFeedback(): IntArray? {
         // Called at 50 Hz by the app while it is alive — the main proof of life.
-        lastCallAt.set(System.currentTimeMillis())
+        touch()
         return try {
             UInputNative.pollFFEvent()
         } catch (t: Throwable) {
@@ -167,6 +187,7 @@ class UInputService : IUInputService.Stub {
     }
 
     override fun runShellCommand(cmd: Array<String>?): Int {
+        touch()
         if (cmd.isNullOrEmpty()) return -1
         return try {
             val proc =
@@ -183,6 +204,7 @@ class UInputService : IUInputService.Stub {
     }
 
     override fun runShellCommandForOutput(cmd: Array<String>?): String? {
+        touch()
         if (cmd.isNullOrEmpty()) return null
         return try {
             val proc =
@@ -199,6 +221,7 @@ class UInputService : IUInputService.Stub {
     }
 
     override fun destroy() {
+        touch()
         try {
             UInputNative.destroy()
         } catch (t: Throwable) {

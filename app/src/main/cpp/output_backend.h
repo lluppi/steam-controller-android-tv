@@ -6,7 +6,7 @@
 // is backend-agnostic and lives in Kotlin.
 #pragma once
 
-#include "hid_common.h"
+#include <stdint.h>
 
 // The backend that was selected. These values cross the AIDL boundary — keep in
 // sync with UInputService.kt / ControllerService.InjectionMode.
@@ -29,6 +29,7 @@ public:
     virtual ~OutputBackend() = default;
 
     virtual const char* name() const = 0;
+    virtual bool supportsRumble() const = 0;
 
     // Whether this backend's device node can be opened right now. Never creates
     // anything, so it is cheap and side-effect free.

@@ -9,6 +9,8 @@ import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.steamcontroller.android.input.SteamHaptics
+import com.steamcontroller.android.service.Diagnostics
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -49,6 +51,14 @@ class BluetoothHidManager(private val context: Context) {
 
         /** Rate-limit for the "link is not recovering" diagnostic. */
         private const val LINK_TROUBLE_COOLDOWN_MS = 120_000L
+
+        /** One outstanding GATT operation is allowed; retry a busy descriptor once after this. */
+        private const val SUBSCRIBE_BUSY_RETRY_MS = 150L
+
+        private const val BATTERY_POLL_INTERVAL_MS = 30_000L
+        private const val BATTERY_POLL_BUSY_RETRY_MS = 750L
+        private const val BATTERY_POLL_FIRST_DELAY_MS = 500L
+        private const val MAX_BUSY_READ_RETRIES = 3
     }
 
     private enum class State { IDLE, CONNECTING, MTU_REQUESTED, DISCOVERING, SUBSCRIBING, READY }
@@ -59,10 +69,10 @@ class BluetoothHidManager(private val context: Context) {
     private var gatt: BluetoothGatt? = null
     private var featureWriteChar: BluetoothGattCharacteristic? = null
     private var batteryChar: BluetoothGattCharacteristic? = null
-    private var pendingBatteryRead = false
 
     private val pendingSubs = mutableListOf<BluetoothGattCharacteristic>()
     private var subsIndex = 0
+    private var subscriptionBusyRetries = 0
 
     @Volatile private var state: State = State.IDLE
     private val heartbeatBusy = AtomicBoolean(false)
@@ -82,6 +92,8 @@ class BluetoothHidManager(private val context: Context) {
     private var targetDevice: BluetoothDevice? = null
     private val handler = Handler(Looper.getMainLooper())
     private val reconnectRunnable = Runnable { attemptReconnect("backoff") }
+    private var batteryPollRunnable: Runnable? = null
+    private var consecutiveBusyReads = 0
     private var aclReceiver: BroadcastReceiver? = null
 
     // Set when a handshake stalls, so the next connect clears the stack's cached GATT database
@@ -124,13 +136,24 @@ class BluetoothHidManager(private val context: Context) {
         reconnectEnabled = true
         reconnectAttempts = 0
         registerAclReceiver(device)
-        Log.i(TAG, "Connecting GATT to ${safeName(device)} (${device.address})")
+        val message = "connecting GATT to ${safeName(device)} (${device.address})"
+        Log.i(TAG, message)
+        Diagnostics.record(TAG, message)
         state = State.CONNECTING
         // A previous client's claim may still be registered with the stack (e.g. the app was
         // killed mid-session), which makes the new connect fail with 133. Release it first.
         closeGatt()
         gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
         armWatchdog("connect")
+    }
+
+    /** Immediately rebuild only the GATT link, preserving the virtual input devices. */
+    fun reconnect() {
+        if (!reconnectEnabled || targetDevice == null) return
+        handler.removeCallbacks(reconnectRunnable)
+        reconnectScheduled = false
+        reconnectAttempts = 0
+        attemptReconnect("manual reconnect")
     }
 
     /** Backoff: 1s, 2s, 4s, 8s, 16s, then every 30s. */
@@ -141,7 +164,10 @@ class BluetoothHidManager(private val context: Context) {
         if (!reconnectEnabled || reconnectScheduled) return
         val delayMs = reconnectDelayMs()
         reconnectScheduled = true
-        Log.i(TAG, "Will retry GATT in ${delayMs}ms ($reason), attempt ${reconnectAttempts + 1}")
+        val message =
+            "retry GATT in ${delayMs}ms ($reason), attempt ${reconnectAttempts + 1}"
+        Log.i(TAG, message)
+        Diagnostics.record(TAG, message)
         handler.postDelayed(reconnectRunnable, delayMs)
     }
 
@@ -167,6 +193,7 @@ class BluetoothHidManager(private val context: Context) {
 
     /** Close the current client without touching the retry loop. */
     private fun closeGatt() {
+        stopBatteryPolling()
         try {
             gatt?.disconnect()
         } catch (_: Throwable) {}
@@ -334,6 +361,43 @@ class BluetoothHidManager(private val context: Context) {
         handler.removeCallbacks(handshakeWatchdog)
     }
 
+    private fun startBatteryPolling(g: BluetoothGatt) {
+        stopBatteryPolling()
+        val characteristic = batteryChar ?: return
+        val poll =
+            object : Runnable {
+                override fun run() {
+                    if (state != State.READY || gatt !== g) return
+                    val accepted =
+                        try {
+                            g.readCharacteristic(characteristic)
+                        } catch (t: Throwable) {
+                            Log.w(TAG, "Battery read threw: ${t.message}")
+                            false
+                        }
+                    consecutiveBusyReads = if (accepted) 0 else consecutiveBusyReads + 1
+                    if (consecutiveBusyReads == MAX_BUSY_READ_RETRIES) {
+                        Log.w(TAG, "Battery reads repeatedly refused; backing off")
+                    }
+                    val delay =
+                        if (consecutiveBusyReads in 1 until MAX_BUSY_READ_RETRIES) {
+                            BATTERY_POLL_BUSY_RETRY_MS
+                        } else {
+                            BATTERY_POLL_INTERVAL_MS
+                        }
+                    handler.postDelayed(this, delay)
+                }
+            }
+        batteryPollRunnable = poll
+        handler.postDelayed(poll, BATTERY_POLL_FIRST_DELAY_MS)
+    }
+
+    private fun stopBatteryPolling() {
+        batteryPollRunnable?.let(handler::removeCallbacks)
+        batteryPollRunnable = null
+        consecutiveBusyReads = 0
+    }
+
     fun disconnect() {
         // Explicit teardown: stop retrying, or the loop resurrects the link the caller just cut.
         reconnectEnabled = false
@@ -350,9 +414,10 @@ class BluetoothHidManager(private val context: Context) {
             gatt = null
             featureWriteChar = null
             batteryChar = null
-            pendingBatteryRead = false
+            stopBatteryPolling()
             pendingSubs.clear()
             subsIndex = 0
+            subscriptionBusyRetries = 0
             state = State.IDLE
             onConnectionChange?.invoke(false)
         }
@@ -391,7 +456,7 @@ class BluetoothHidManager(private val context: Context) {
         val g = gatt ?: return
 
         // Send left then right. WRITE_NO_RESPONSE so they don't queue up acks.
-        for (payload in listOf(magnitudeToPayload(0, strong), magnitudeToPayload(1, weak))) {
+        for (payload in listOf(SteamHaptics.payload(0, strong), SteamHaptics.payload(1, weak))) {
             try {
                 ch.value = payload
                 ch.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
@@ -400,61 +465,6 @@ class BluetoothHidManager(private val context: Context) {
                 Log.w(TAG, "rumble write failed: ${t.message}")
             }
         }
-    }
-
-    private fun magnitudeToPayload(padId: Int, magnitude: Int): ByteArray {
-        val mag = magnitude.coerceIn(0, 0xFFFF)
-        if (mag == 0) {
-            // BUG FIX (2026-07-12): this used to return null here and sendRumble() would
-            // bail out without writing anything at all, on the assumption that "the
-            // controller will stop on its own once the previous pulse's repeat count
-            // expires". Confirmed wrong on hardware — a repeat=1 pulse from the branch
-            // below just buzzes continuously, and the calibration screen's "Test rumble"
-            // button had no way to ever stop it (magnitude 0 was silently skipped).
-            // Explicit stop: repeat=0 to cancel any in-flight pulse train.
-            return byteArrayOf(0x8F.toByte(), padId.toByte(), 0, 0, 0, 0, 0, 0)
-        }
-        // FIX (2026-07-12): the previous mapping kept lowPeriod fixed at 1000us and only
-        // scaled highPeriod (100-2000us), which changes the pulse *frequency* across the
-        // magnitude range (from ~1/(100+1000)=909Hz at low magnitude down to
-        // 1/(2000+1000)=333Hz at max). LRA actuators (used in the Steam Controller's
-        // haptics) only move significantly near their mechanical resonant frequency —
-        // typically ~170-200Hz for this class of actuator — so most of that range was
-        // driving well off-resonance, which loses amplitude independently of duty cycle.
-        // Now the cycle period is held ~constant near resonance and only the duty cycle
-        // (high/low ratio) varies with magnitude, which is the correct lever for perceived
-        // intensity on a fixed-frequency drive. Exact resonant frequency is unconfirmed for
-        // the SC2026 (no datasheet) — retune totalPeriodUs if this still feels off.
-        //
-        // ROUND 2 (2026-07-12): still too weak at 182Hz/88% max duty. Two changes together
-        // (confounds the next test, but each is independently well-motivated and cheap to
-        // back out if needed): nudged the frequency down to ~160Hz (period 6250us — some
-        // LRAs used in game controllers resonate lower than 182Hz), and pushed max duty
-        // from 88% to 97% (near-continuous drive at full magnitude — 0x8F's on/off pulse
-        // model may just have a firmness ceiling below what a "big motor spins" rumble
-        // feels like; 97% duty is close to that ceiling for this command).
-        val totalPeriodUs = 6250 // ~160Hz
-        val minDutyPct = 25
-        val maxDutyPct = 97
-        val dutyPct = minDutyPct + (mag * (maxDutyPct - minDutyPct) / 0xFFFF)
-        val highPeriod = (totalPeriodUs * dutyPct / 100).coerceIn(1, totalPeriodUs - 1)
-        val lowPeriod = totalPeriodUs - highPeriod
-        // FIX (2026-07-12): was hardcoded to 1 — a single ~2-3ms pulse per send, repeated
-        // only every 50-200ms by ControllerService.forwardRumble's throttle, so the motor
-        // sat idle >95% of the time. Confirmed on hardware: felt too weak. 0xFFFF matches
-        // our own documented protocol ("repeat count, 0xFFFF for continuous") — the pulse
-        // now cycles continuously between sends instead of firing one brief blip.
-        val repeat = 0xFFFF
-        return byteArrayOf(
-            0x8F.toByte(), // command id (HAPTIC_PULSE)
-            padId.toByte(),
-            (highPeriod and 0xFF).toByte(),
-            (highPeriod shr 8 and 0xFF).toByte(),
-            (lowPeriod and 0xFF).toByte(),
-            (lowPeriod shr 8 and 0xFF).toByte(),
-            (repeat and 0xFF).toByte(),
-            (repeat shr 8 and 0xFF).toByte()
-        )
     }
 
     fun sendHeartbeat() {
@@ -476,10 +486,23 @@ class BluetoothHidManager(private val context: Context) {
         }
     }
 
+    private fun isStaleGatt(g: BluetoothGatt): Boolean {
+        if (g === gatt) return false
+        Log.v(TAG, "Ignoring callback from replaced GATT client")
+        try {
+            g.close()
+        } catch (_: Throwable) {
+        }
+        return true
+    }
+
     private val gattCallback = object : BluetoothGattCallback() {
 
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
-            Log.i(TAG, "onConnectionStateChange status=$status newState=$newState")
+            if (isStaleGatt(g)) return
+            val message = "connection state status=$status newState=$newState"
+            Log.i(TAG, message)
+            Diagnostics.record(TAG, message)
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     onConnectionChange?.invoke(true)
@@ -515,8 +538,10 @@ class BluetoothHidManager(private val context: Context) {
                     } catch (_: Throwable) {}
                     gatt = null
                     featureWriteChar = null
+                    stopBatteryPolling()
                     pendingSubs.clear()
                     subsIndex = 0
+                    subscriptionBusyRetries = 0
                     state = State.IDLE
                     clearWatchdog()
                     scheduleReconnect("disconnected status=$status")
@@ -525,6 +550,7 @@ class BluetoothHidManager(private val context: Context) {
         }
 
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
+            if (isStaleGatt(g)) return
             Log.i(TAG, "onMtuChanged: mtu=$mtu status=$status (state=$state)")
             // Guard: this callback is sometimes fired twice on Android. Only act once.
             if (state != State.MTU_REQUESTED) return
@@ -535,6 +561,7 @@ class BluetoothHidManager(private val context: Context) {
         }
 
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
+            if (isStaleGatt(g)) return
             Log.i(TAG, "onServicesDiscovered status=$status (state=$state)")
             if (state != State.DISCOVERING) return
             if (status != BluetoothGatt.GATT_SUCCESS) {
@@ -597,10 +624,12 @@ class BluetoothHidManager(private val context: Context) {
             descriptor: BluetoothGattDescriptor,
             status: Int
         ) {
+            if (isStaleGatt(g)) return
             Log.v(
                 TAG,
                 "onDescriptorWrite ${descriptor.uuid} status=$status (state=$state, idx=$subsIndex/${pendingSubs.size})"
             )
+            subscriptionBusyRetries = 0
             if (state == State.SUBSCRIBING) subscribeNext(g)
         }
 
@@ -609,16 +638,11 @@ class BluetoothHidManager(private val context: Context) {
             ch: BluetoothGattCharacteristic,
             status: Int
         ) {
+            if (isStaleGatt(g)) return
             heartbeatBusy.set(false)
             if (status != 0) Log.w(TAG, "Write ${ch.uuid} failed: status=$status")
             // The disable-lizard write is the last handshake step.
             if (state == State.READY) clearWatchdog()
-            // GATT ops are serialized (only one in flight) — chain the seed battery read
-            // right after the disable-lizard write that follows subscription setup finishes.
-            if (pendingBatteryRead) {
-                pendingBatteryRead = false
-                batteryChar?.let { g.readCharacteristic(it) }
-            }
         }
 
         // Deprecated 3-arg overload (not the API 33+ byte[]-carrying one) — minSdk 26 means
@@ -629,19 +653,24 @@ class BluetoothHidManager(private val context: Context) {
             ch: BluetoothGattCharacteristic,
             status: Int
         ) {
+            if (isStaleGatt(g)) return
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                Log.w(TAG, "Battery seed read failed: status=$status")
+                Log.w(TAG, "Battery read failed: status=$status")
                 return
             }
             clearWatchdog()
             val data = ch.value ?: return
-            if (shortUuid(ch.uuid) == BATTERY_CHAR_SHORT && data.size == 14) {
-                onReport?.invoke(byteArrayOf(0x43.toByte(), data[1], 0x00))
+            if (shortUuid(ch.uuid) != BATTERY_CHAR_SHORT) return
+            if (data.size < 2) {
+                Log.w(TAG, "Battery read too short (${data.size}B)")
+                return
             }
+            onReport?.invoke(byteArrayOf(0x43.toByte(), data[1], 0x00))
         }
 
         private var reportCounter = 0
         override fun onCharacteristicChanged(g: BluetoothGatt, ch: BluetoothGattCharacteristic) {
+            if (isStaleGatt(g)) return
             val data = ch.value ?: return
             reportCounter++
             val short = shortUuid(ch.uuid)
@@ -703,17 +732,14 @@ class BluetoothHidManager(private val context: Context) {
             hadReadySession = true
             if (ch == null) {
                 Log.w(TAG, "No feature write char; skipping disable lizard")
-                // Notify-only battery char never pushes until its value changes on the
-                // firmware side — seed it with an explicit read so the UI isn't stuck on
-                // "—" for controllers whose battery % doesn't tick during the session.
-                batteryChar?.let { g.readCharacteristic(it) }
+                startBatteryPolling(g)
                 return
             }
             ch.value = DISABLE_LIZARD
             ch.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            pendingBatteryRead = batteryChar != null
             val ok = g.writeCharacteristic(ch)
             Log.i(TAG, "Disable lizard write: $ok")
+            startBatteryPolling(g)
             return
         }
 
@@ -729,8 +755,20 @@ class BluetoothHidManager(private val context: Context) {
         val wOk = g.writeDescriptor(cccd)
         Log.v(TAG, "Subscribe ${ch.uuid} idx=${subsIndex - 1} setNotify=$nOk writeDesc=$wOk")
         if (!wOk) {
-            // Move on; we'll lose this one but try the rest
-            subscribeNext(g)
+            if (subscriptionBusyRetries == 0) {
+                // A rejected write normally means another GATT operation is still in flight.
+                // Retry this characteristic once instead of cascading the same failure through
+                // every remaining subscription.
+                subscriptionBusyRetries++
+                subsIndex--
+            } else {
+                Log.w(TAG, "Giving up on ${ch.uuid} after a busy retry")
+                subscriptionBusyRetries = 0
+            }
+            handler.postDelayed(
+                { if (state == State.SUBSCRIBING) subscribeNext(g) },
+                SUBSCRIBE_BUSY_RETRY_MS
+            )
         }
     }
 

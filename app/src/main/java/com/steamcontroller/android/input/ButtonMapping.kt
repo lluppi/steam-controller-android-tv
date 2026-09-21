@@ -1,6 +1,7 @@
 package com.steamcontroller.android.input
 
 import com.steamcontroller.android.parser.Buttons
+import com.steamcontroller.android.parser.SteamControllerState
 import com.steamcontroller.android.uinput.XboxButtons
 
 enum class ButtonCategory(val title: String) {
@@ -15,10 +16,10 @@ enum class ButtonCategory(val title: String) {
 
 /**
  * Physical buttons on the Steam Controller 2026 that can be remapped.
- * `mask` is the bit position in `SteamControllerState.buttons`.
+ * `mask` is the bit position in `SteamControllerState.buttons`; triggers use their analog
+ * values because the previously assumed LT-full bit is the verified right-pad-click bit.
  *
- * DPAD, triggers and trackpads are intentionally NOT here — they're routed as
- * axes (HAT / LTRIGGER / RTRIGGER), not as remappable button bits.
+ * DPAD and trackpads are intentionally not here because they are routed as axes and pointers.
  */
 enum class SteamButton(val mask: Int, val displayName: String, val category: ButtonCategory) {
     A(Buttons.A, "A", ButtonCategory.FACE),
@@ -28,12 +29,9 @@ enum class SteamButton(val mask: Int, val displayName: String, val category: But
     LB(Buttons.LB, "L1 / LB", ButtonCategory.BUMPERS),
     RB(Buttons.RB, "R1 / RB", ButtonCategory.BUMPERS),
 
-    // Trigger full-press = digital bit fired when the analog trigger reaches max travel.
-    // The analog 0..32767 value still routes automatically to LT/RT axes on the
-    // emulated gamepad — these entries only matter if you remap "fully pulled" to a
-    // different action (e.g. RT-full → A button). LT_FULL bit at 0x400000 is V1.2-empirical.
-    LT(Buttons.LT_FULL, "L2 / LT (full press)", ButtonCategory.TRIGGERS),
-    RT(Buttons.RT_FULL, "R2 / RT (full press)", ButtonCategory.TRIGGERS),
+    // A near-full analog pull is the only trustworthy trigger-button signal on this firmware.
+    LT(0, "L2 / LT (full press)", ButtonCategory.TRIGGERS),
+    RT(0, "R2 / RT (full press)", ButtonCategory.TRIGGERS),
     LS(Buttons.LS, "L3 (stick click)", ButtonCategory.STICKS),
     RS(Buttons.RS, "R3 (stick click)", ButtonCategory.STICKS),
     MENU(Buttons.MENU, "Menu (Start)", ButtonCategory.SYSTEM),
@@ -46,6 +44,12 @@ enum class SteamButton(val mask: Int, val displayName: String, val category: But
     R5(Buttons.R5, "R5 back paddle", ButtonCategory.BACK_PADDLES),
     GRIP_LT(Buttons.GRIP_LT, "Left grip", ButtonCategory.GRIPS),
     GRIP_RT(Buttons.GRIP_RT, "Right grip", ButtonCategory.GRIPS);
+
+    fun isPressed(state: SteamControllerState): Boolean = when (this) {
+        LT -> state.leftTrigger >= FULL_TRIGGER_THRESHOLD
+        RT -> state.rightTrigger >= FULL_TRIGGER_THRESHOLD
+        else -> state.isButtonPressed(mask)
+    }
 
     /** Short label fits inside a chip badge (≤4 chars) */
     val shortLabel: String get() = when (this) {
@@ -69,6 +73,10 @@ enum class SteamButton(val mask: Int, val displayName: String, val category: But
         GRIP_LT -> "LG"
         GRIP_RT -> "RG"
         QUICK_ACCESS -> "QA"
+    }
+
+    private companion object {
+        const val FULL_TRIGGER_THRESHOLD = 30_000
     }
 }
 
@@ -113,8 +121,12 @@ enum class XboxTarget(
     LT_TRIGGER(-30, "L2 / LT (full press)", triggerSide = 1),
     RT_TRIGGER(-31, "R2 / RT (full press)", triggerSide = 2),
 
-    // ── Sidecar keyboard keys (great for back paddles in gamepad mode) ───────
+    // ── Sidecar keyboard and pointer actions ─────────────────────────────────
     // keyBit values must match MouseTarget.bit positions (see MouseTarget.kt).
+    KB_UP(-32, "↑ Up", keyBit = 0),
+    KB_DOWN(-33, "↓ Down", keyBit = 1),
+    KB_LEFT(-34, "← Left", keyBit = 2),
+    KB_RIGHT(-35, "→ Right", keyBit = 3),
     KB_VOLUME_UP(-10, "🔊 Volume +", keyBit = 10),
     KB_VOLUME_DOWN(-11, "🔉 Volume -", keyBit = 11),
     KB_PLAY_PAUSE(-12, "⏯ Play / Pause", keyBit = 12),
@@ -127,9 +139,36 @@ enum class XboxTarget(
     KB_SPACE(-19, "␣ Space", keyBit = 7),
     KB_BACKSPACE(-20, "⌫ Backspace", keyBit = 14),
     KB_MENU(-21, "☰ Menu (context)", keyBit = 13),
+    MOUSE_LEFT(-36, "🖱 Left click", keyBit = 16),
+    MOUSE_RIGHT(-37, "🖱 Right click", keyBit = 17),
+    MOUSE_MIDDLE(-38, "🖱 Middle click", keyBit = 18),
 
     // Special actions (mask < 0, no keyBit). Edge-triggered on press in Kotlin.
-    SCREENSHOT(-1, "📸 Take screenshot")
+    SCREENSHOT(-1, "📸 Take screenshot"),
+    GUIDE_LAYER(-2, "Guide tap / action layer hold");
+
+    companion object {
+        // Exact order used by releases that persisted enum ordinals. New entries must never be
+        // added here: current releases persist enum names instead.
+        private val LEGACY_ORDINAL_TARGETS =
+            arrayOf(
+                NONE, A, B, X, Y, LB, RB, SELECT, START, MODE, THUMBL, THUMBR,
+                LT_TRIGGER, RT_TRIGGER, KB_VOLUME_UP, KB_VOLUME_DOWN, KB_PLAY_PAUSE,
+                KB_BACK, KB_HOME, KB_ENTER, KB_DPAD_CENTER, KB_ESCAPE, KB_TAB, KB_SPACE,
+                KB_BACKSPACE, KB_MENU, SCREENSHOT
+            )
+
+        /** Stable persistence ID. Enum names are an on-disk contract and must not be renamed. */
+        fun fromPersisted(value: Any?): XboxTarget? = when (value) {
+            is Number -> LEGACY_ORDINAL_TARGETS.getOrNull(value.toInt())
+
+            is String ->
+                values().firstOrNull { it.name == value }
+                    ?: value.toIntOrNull()?.let { LEGACY_ORDINAL_TARGETS.getOrNull(it) }
+
+            else -> null
+        }
+    }
 }
 
 /** Default mapping — reproduces the hardcoded mapping that existed before this feature. */
@@ -160,3 +199,35 @@ val DEFAULT_MAPPING: Map<SteamButton, XboxTarget> = mapOf(
     SteamButton.GRIP_LT to XboxTarget.NONE,
     SteamButton.GRIP_RT to XboxTarget.NONE
 )
+
+val DEFAULT_ACTION_LAYER: Map<SteamButton, XboxTarget> =
+    mapOf(
+        SteamButton.L4 to XboxTarget.KB_VOLUME_DOWN,
+        SteamButton.R4 to XboxTarget.KB_VOLUME_UP,
+        SteamButton.L5 to XboxTarget.KB_PLAY_PAUSE,
+        SteamButton.R5 to XboxTarget.SCREENSHOT
+    )
+
+val DEFAULT_DESKTOP_MAPPING: Map<SteamButton, XboxTarget> =
+    mapOf(
+        SteamButton.A to XboxTarget.KB_DPAD_CENTER,
+        SteamButton.B to XboxTarget.KB_BACK,
+        SteamButton.X to XboxTarget.KB_SPACE,
+        SteamButton.Y to XboxTarget.KB_TAB,
+        SteamButton.LB to XboxTarget.MOUSE_RIGHT,
+        SteamButton.RB to XboxTarget.MOUSE_LEFT,
+        SteamButton.LT to XboxTarget.NONE,
+        SteamButton.RT to XboxTarget.NONE,
+        SteamButton.LS to XboxTarget.KB_HOME,
+        SteamButton.RS to XboxTarget.MOUSE_MIDDLE,
+        SteamButton.MENU to XboxTarget.KB_MENU,
+        SteamButton.VIEW to XboxTarget.KB_ESCAPE,
+        SteamButton.STEAM to XboxTarget.KB_HOME,
+        SteamButton.QUICK_ACCESS to XboxTarget.KB_PLAY_PAUSE,
+        SteamButton.L4 to XboxTarget.KB_VOLUME_DOWN,
+        SteamButton.R4 to XboxTarget.KB_VOLUME_UP,
+        SteamButton.L5 to XboxTarget.KB_BACKSPACE,
+        SteamButton.R5 to XboxTarget.NONE,
+        SteamButton.GRIP_LT to XboxTarget.NONE,
+        SteamButton.GRIP_RT to XboxTarget.NONE
+    )

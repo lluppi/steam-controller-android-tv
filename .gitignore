@@ -10,18 +10,10 @@
 # Java class files
 *.class
 
-# Generated files
-bin/
-gen/
-out/
-release/
-
 # Gradle files
 .gradle/
 build/
 /build
-/captures
-.externalNativeBuild
 .cxx
 
 # Local configuration file (sdk path, etc)
@@ -33,7 +25,6 @@ local.properties
 .kotlin/
 *.iws
 *.ipr
-.navigation/
 
 # Keystore files (signing secrets — NEVER commit)
 *.jks
@@ -50,13 +41,6 @@ desktop.ini
 
 # Logs
 *.log
-
-# Tooling artifacts
-.cxx/
-
-# Claude Code workspace metadata (private)
-.claude/
-CLAUDE.md
 
 # AGP-generated native compile database (symlinked at the root for clangd/IDE use)
 compile_commands.json

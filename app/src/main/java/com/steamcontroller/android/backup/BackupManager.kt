@@ -2,6 +2,7 @@ package com.steamcontroller.android.backup
 
 import android.content.Context
 import com.steamcontroller.android.Prefs
+import com.steamcontroller.android.input.GyroActivation
 import com.steamcontroller.android.input.NamedProfile
 import com.steamcontroller.android.input.SteamButton
 import com.steamcontroller.android.input.StickCalibration
@@ -21,7 +22,7 @@ import org.json.JSONObject
  */
 object BackupManager {
 
-    private const val SCHEMA_VERSION = 1
+    private const val SCHEMA_VERSION = 3
 
     fun export(context: Context): String {
         val leftCal = Prefs.getLeftCalibration(context)
@@ -35,9 +36,38 @@ object BackupManager {
             put("rumbleIntensity", Prefs.getRumbleIntensity(context))
             put("mouseSensitivity", Prefs.getMouseSensitivity(context).toDouble())
             put("trackpadAsMouse", Prefs.getTrackpadAsMouseInGamepad(context))
-            put("mapping", JSONObject().apply {
-                Prefs.getAllMappings(context).forEach { (btn, target) -> put(btn.name, target.ordinal) }
-            })
+            val gyro = Prefs.getGyroTuning(context)
+            put(
+                "gyro",
+                JSONObject().apply {
+                    put("enabled", Prefs.getGyroEnabled(context))
+                    put("activation", Prefs.getGyroActivation(context).id)
+                    put("sensitivityX", gyro.sensitivityX.toDouble())
+                    put("sensitivityY", gyro.sensitivityY.toDouble())
+                    put("smoothing", gyro.smoothing.toDouble())
+                    put("deadzone", gyro.deadzoneRadS.toDouble())
+                    put("response", gyro.responseExponent.toDouble())
+                    put("invertY", Prefs.getGyroInvertY(context))
+                    put("biasX", gyro.biasX.toDouble())
+                    put("biasY", gyro.biasY.toDouble())
+                }
+            )
+            put(
+                "mapping",
+                JSONObject().apply {
+                    Prefs.getAllMappings(context).forEach { (btn, target) ->
+                        put(btn.name, target.name)
+                    }
+                }
+            )
+            put(
+                "desktopMapping",
+                JSONObject().apply {
+                    Prefs.getAllDesktopMappings(context).forEach { (btn, target) ->
+                        put(btn.name, target.name)
+                    }
+                }
+            )
         }
 
         val profiles = JSONArray().apply {
@@ -61,18 +91,70 @@ object BackupManager {
             live.optInt("gamepadProfileId", -1).takeIf { it >= 0 }?.let {
                 Prefs.setProfile(context, GamepadProfile.fromId(it))
             }
-            live.optJSONObject("leftCal")?.let { Prefs.setLeftCalibration(context, calFromJson(it)) }
-            live.optJSONObject("rightCal")?.let { Prefs.setRightCalibration(context, calFromJson(it)) }
-            if (live.has("rumbleIntensity")) Prefs.setRumbleIntensity(context, live.optInt("rumbleIntensity", 100))
-            if (live.has("mouseSensitivity")) Prefs.setMouseSensitivity(context, live.optDouble("mouseSensitivity", 1.0).toFloat())
-            if (live.has("trackpadAsMouse")) Prefs.setTrackpadAsMouseInGamepad(context, live.optBoolean("trackpadAsMouse", true))
+            live.optJSONObject("leftCal")?.let {
+                Prefs.setLeftCalibration(context, calFromJson(it))
+            }
+            live.optJSONObject("rightCal")?.let {
+                Prefs.setRightCalibration(context, calFromJson(it))
+            }
+            if (live.has(
+                    "rumbleIntensity"
+                )
+            ) {
+                Prefs.setRumbleIntensity(context, live.optInt("rumbleIntensity", 100))
+            }
+            if (live.has(
+                    "mouseSensitivity"
+                )
+            ) {
+                Prefs.setMouseSensitivity(
+                    context,
+                    live.optDouble("mouseSensitivity", 1.0).toFloat()
+                )
+            }
+            if (live.has(
+                    "trackpadAsMouse"
+                )
+            ) {
+                Prefs.setTrackpadAsMouseInGamepad(
+                    context,
+                    live.optBoolean("trackpadAsMouse", true)
+                )
+            }
+            live.optJSONObject("gyro")?.let { gyro ->
+                Prefs.setGyroEnabled(context, gyro.optBoolean("enabled", false))
+                Prefs.setGyroActivation(
+                    context,
+                    GyroActivation.fromId(
+                        gyro.optInt("activation", GyroActivation.RIGHT_PAD_TOUCH.id)
+                    )
+                )
+                Prefs.setGyroSensitivity(
+                    context,
+                    gyro.optDouble("sensitivityX", 1.0).toFloat()
+                )
+                Prefs.setGyroSensitivityY(
+                    context,
+                    gyro.optDouble("sensitivityY", 1.0).toFloat()
+                )
+                Prefs.setGyroSmoothing(context, gyro.optDouble("smoothing", 0.25).toFloat())
+                Prefs.setGyroDeadzone(context, gyro.optDouble("deadzone", 0.02).toFloat())
+                Prefs.setGyroResponse(context, gyro.optDouble("response", 1.0).toFloat())
+                Prefs.setGyroInvertY(context, gyro.optBoolean("invertY", false))
+                Prefs.setGyroBias(
+                    context,
+                    gyro.optDouble("biasX", 0.0).toFloat(),
+                    gyro.optDouble("biasY", 0.0).toFloat()
+                )
+            }
             live.optJSONObject("mapping")?.let { mapObj ->
-                val targets = XboxTarget.values()
-                SteamButton.values().forEach { btn ->
-                    if (mapObj.has(btn.name)) {
-                        val target = targets.getOrNull(mapObj.optInt(btn.name, -1)) ?: XboxTarget.NONE
-                        Prefs.setMapping(context, btn, target)
-                    }
+                importMapping(mapObj) { button, target ->
+                    Prefs.setMapping(context, button, target)
+                }
+            }
+            live.optJSONObject("desktopMapping")?.let { mapObj ->
+                importMapping(mapObj) { button, target ->
+                    Prefs.setDesktopMapping(context, button, target)
                 }
             }
         }
@@ -87,10 +169,21 @@ object BackupManager {
         }
 
         if (!root.isNull("activeNamedProfileId") && root.has("activeNamedProfileId")) {
-            Prefs.setActiveNamedProfileId(context, root.optString("activeNamedProfileId", null))
+            Prefs.setActiveNamedProfileId(context, root.getString("activeNamedProfileId"))
         }
 
         return restoredCount
+    }
+
+    private fun importMapping(json: JSONObject, save: (SteamButton, XboxTarget) -> Unit) {
+        SteamButton.values().forEach { button ->
+            if (json.has(button.name)) {
+                save(
+                    button,
+                    XboxTarget.fromPersisted(json.opt(button.name)) ?: XboxTarget.NONE
+                )
+            }
+        }
     }
 
     private fun calToJson(c: StickCalibration): JSONObject = JSONObject().apply {
@@ -104,6 +197,6 @@ object BackupManager {
         centerX = o.optInt("cx", 0),
         centerY = o.optInt("cy", 0),
         deadzonePercent = o.optInt("dz", 8),
-        invertY = o.optBoolean("invY", false),
+        invertY = o.optBoolean("invY", false)
     )
 }

@@ -68,9 +68,16 @@ class ControllerService : Service() {
         const val CHANNEL_ID = "steam_controller"
         const val EXTRA_DEVICE = "usb_device"
         const val ACTION_STOP = "com.steamcontroller.android.STOP"
+        const val ACTION_RESTART = "com.steamcontroller.android.RESTART"
+        const val ACTION_RECONNECT = "com.steamcontroller.android.RECONNECT"
         const val ACTION_NEXT_PROFILE = "com.steamcontroller.android.NEXT_PROFILE"
         const val ACTION_TEST_RUMBLE = "com.steamcontroller.android.TEST_RUMBLE"
         private const val TEST_RUMBLE_DURATION_MS = 5000L
+        private const val UNBIND_TIMEOUT_MS = 2000L
+
+        @Volatile
+        var isRunning = false
+            private set
 
         /** How often the link-liveness status is recomputed. */
         private const val LINK_POLL_MS = 1500L
@@ -93,7 +100,8 @@ class ControllerService : Service() {
             val profileId: Int? = null,
             val backend: Int = UInputNative.Backend.NONE,
             val backendDetail: String = "",
-            val rumbleSupported: Boolean = true
+            val rumbleSupported: Boolean = true,
+            val reportRateHz: Int = 0
         )
 
         // One flow rather than one per field: six independent flows could (and did) disagree
@@ -123,9 +131,13 @@ class ControllerService : Service() {
 
     @Volatile private var btConnected = false
 
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
+
     // Diagnostic for the trackpad clicks (see onHidFrame).
     private var lastRawLogButtons = 0
     private var lastRawLogMs = 0L
+    private var rateWindowStartedAt = 0L
+    private var rateFrameCount = 0
     private var reader: HidReportReader? = null
     private var heartbeatJob: Job? = null
 
@@ -138,21 +150,48 @@ class ControllerService : Service() {
     private val INJECTABLE_MASK =
         Buttons.A or Buttons.B or Buttons.X or Buttons.Y or
             Buttons.LB or Buttons.RB or
-            Buttons.LT_FULL or Buttons.RT_FULL or
             Buttons.MENU or Buttons.VIEW or Buttons.STEAM or Buttons.QUICK_ACCESS or
             Buttons.LS or Buttons.RS or
             Buttons.L4 or Buttons.L5 or Buttons.R4 or Buttons.R5 or
             Buttons.DPAD_UP or Buttons.DPAD_DOWN or Buttons.DPAD_LEFT or Buttons.DPAD_RIGHT
 
-    // Debounce window. USB=333Hz so 5 frames = ~15ms. BT=~150Hz so 3 frames = ~20ms.
-    // Tuned to filter capacitive noise without adding perceptible button latency.
-    private val DEBOUNCE_FRAMES = 3
+    // A time window keeps mechanical-button latency consistent across USB and Bluetooth.
+    private val DEBOUNCE_MS = 12L
     private var confirmedState: SteamControllerState? = null
     private var pendingButtons = 0
-    private var pendingFrames = 0
+    private var pendingSinceMs = 0L
+
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        try {
+            wakeLock =
+                getSystemService(android.os.PowerManager::class.java)
+                    ?.newWakeLock(
+                        android.os.PowerManager.PARTIAL_WAKE_LOCK,
+                        "SteamController::bluetooth"
+                    )?.apply {
+                        setReferenceCounted(false)
+                        acquire()
+                    }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Could not acquire Bluetooth wake lock: ${t.message}")
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            wakeLock?.takeIf { it.isHeld }?.release()
+        } catch (t: Throwable) {
+            Log.w(TAG, "Could not release Bluetooth wake lock: ${t.message}")
+        } finally {
+            wakeLock = null
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
+        Diagnostics.record(TAG, "service created")
         usbManager = UsbConnectionManager(this)
         btManager = BluetoothHidManager(this)
         uinput = UInputGamepad(this, Prefs.getProfile(this))
@@ -235,13 +274,22 @@ class ControllerService : Service() {
                     )
             }
         if (_serviceStateFlow.value.link != status) {
-            Log.i(
-                TAG,
+            val message =
                 "link status: ${status.state}" +
                     if (status.detail.isEmpty()) "" else " — ${status.detail}"
-            )
+            Log.i(TAG, message)
+            Diagnostics.record(TAG, message)
         }
-        _serviceStateFlow.value = _serviceStateFlow.value.copy(link = status)
+        _serviceStateFlow.value =
+            _serviceStateFlow.value.copy(
+                link = status,
+                reportRateHz =
+                    if (status.state == LinkState.LINKED) {
+                        _serviceStateFlow.value.reportRateHz
+                    } else {
+                        0
+                    }
+            )
     }
 
     // ─── Foreground-app auto-switch (V1.2 Phase 2b) ────────────────────────────
@@ -394,7 +442,8 @@ class ControllerService : Service() {
 
         val now = System.currentTimeMillis()
         val changed = (scaledStrong != lastRumbleStrong || scaledWeak != lastRumbleWeak)
-        val tooSoon = (now - lastRumbleSentAt) < (if (changed) 50 else 200)
+        val stopping = scaledStrong == 0 && scaledWeak == 0
+        val tooSoon = !stopping && (now - lastRumbleSentAt) < (if (changed) 50 else 200)
         if (tooSoon) return
         lastRumbleStrong = scaledStrong
         lastRumbleWeak = scaledWeak
@@ -410,16 +459,21 @@ class ControllerService : Service() {
             }
 
             Transport.USB -> {
-                // USB rumble = feature report via controlTransfer. Not implemented yet —
-                // requires identifying the exact SC2026 feature report ID (likely 0x8F
-                // per hid-steam.c) and payload format. Same byte structure as BT.
-                Log.v(TAG, "USB rumble not implemented yet")
+                val connection = usbManager.connection
+                if (connection == null ||
+                    !SteamHidProtocol.sendRumble(connection, scaledStrong, scaledWeak)
+                ) {
+                    Log.w(TAG, "USB rumble feature report failed")
+                }
             }
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
+        if (intent?.action == ACTION_STOP || intent?.action == ACTION_RESTART) {
+            // Only an explicit Stop disarms controller-connect auto-start. Reconnect and internal
+            // failures must stay armed so a failed retry does not disable future auto-starts.
+            if (intent.action == ACTION_STOP) Prefs.setUserStoppedService(this, true)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -431,6 +485,11 @@ class ControllerService : Service() {
 
         if (intent?.action == ACTION_TEST_RUMBLE) {
             testRumble()
+            return START_STICKY
+        }
+
+        if (intent?.action == ACTION_RECONNECT && initializedTransport == Transport.BLUETOOTH) {
+            btManager.reconnect()
             return START_STICKY
         }
 
@@ -493,7 +552,10 @@ class ControllerService : Service() {
         }
         initializing = false
         initializedTransport = transport
-        Log.i(TAG, "Controller service running, injection mode = $mode")
+        if (transport == Transport.BLUETOOTH) acquireWakeLock()
+        val message = "controller running transport=$transport mode=$mode"
+        Log.i(TAG, message)
+        Diagnostics.record(TAG, message)
     }
 
     private suspend fun initUsb(device: UsbDevice?): Boolean {
@@ -556,6 +618,10 @@ class ControllerService : Service() {
             Log.i(TAG, "Controller address changed ($address → ${device.address}), updating")
             Prefs.setBluetoothAddress(this, device.address)
         }
+        try {
+            Prefs.setBluetoothName(this, device.name)
+        } catch (_: SecurityException) {
+        }
 
         btManager.connect(
             device,
@@ -617,8 +683,22 @@ class ControllerService : Service() {
         }
 
         if (raw.isNotEmpty() && (raw[0].toInt() and 0xFF) == 0x45) {
+            updateReportRate(nowMs)
             handleState(state)
         }
+    }
+
+    private fun updateReportRate(nowMs: Long) {
+        if (rateWindowStartedAt == 0L) rateWindowStartedAt = nowMs
+        rateFrameCount++
+        val elapsed = nowMs - rateWindowStartedAt
+        if (elapsed < 1000L) return
+        val hz = (rateFrameCount * 1000L / elapsed.coerceAtLeast(1L)).toInt()
+        if (_serviceStateFlow.value.reportRateHz != hz) {
+            _serviceStateFlow.value = _serviceStateFlow.value.copy(reportRateHz = hz)
+        }
+        rateWindowStartedAt = nowMs
+        rateFrameCount = 0
     }
 
     // Try a virtual-output backend first (a real InputDevice, so games honour it): uinput
@@ -680,11 +760,6 @@ class ControllerService : Service() {
 
     private fun setMode(newMode: InjectionMode) {
         mode = newMode
-        _serviceStateFlow.value =
-            _serviceStateFlow.value.copy(
-                mode = newMode,
-                rumbleSupported = newMode.isVirtualDevice && uinput.rumbleSupported
-            )
         // Rumble travels over force feedback from the virtual device, which only the uinput
         // backend implements — and only while that device is actually alive.
         _serviceStateFlow.value =
@@ -692,7 +767,6 @@ class ControllerService : Service() {
                 mode = newMode,
                 rumbleSupported = newMode.isVirtualDevice && uinput.rumbleSupported
             )
-        refreshNotification()
         refreshNotification()
     }
 
@@ -702,7 +776,7 @@ class ControllerService : Service() {
     }
 
     /**
-     * Triggered by the notification action: cycle to the next profile (Xbox360 → XboxOne → DS4 → DualSense → ...).
+     * Triggered by the notification action: switch between gamepad and Desktop modes.
      * Only meaningful in uinput mode; in fallback inject mode the profile is ignored.
      */
     // Guards against re-entrant taps on the "Switch profile" notification action while
@@ -728,7 +802,7 @@ class ControllerService : Service() {
         // don't get injected via the now-defunct device.
         confirmedState = null
         pendingButtons = 0
-        pendingFrames = 0
+        pendingSinceMs = 0L
 
         // Run the actual device teardown/recreate off the service main thread —
         // it's a blocking binder + native ioctl pair that can take 100ms+.
@@ -755,31 +829,28 @@ class ControllerService : Service() {
 
     private fun handleState(state: SteamControllerState) {
         if (mode == InjectionMode.NONE) return
+        val now = android.os.SystemClock.uptimeMillis()
 
         // First frame = baseline
         if (confirmedState == null) {
             confirmedState = state
             pendingButtons = state.buttons and INJECTABLE_MASK
-            pendingFrames = 0
+            pendingSinceMs = now
             return
         }
 
-        // Button debounce: only inject after DEBOUNCE_FRAMES consecutive stable frames
+        // Keep the old baseline for fallback injection before a confirmed change replaces it.
+        val previousConfirmed = confirmedState!!
         val injectableBits = state.buttons and INJECTABLE_MASK
         val buttonsConfirmedThisFrame: Boolean
         if (injectableBits == pendingButtons) {
-            pendingFrames++
-            if (pendingFrames >= DEBOUNCE_FRAMES &&
-                injectableBits != (confirmedState!!.buttons and INJECTABLE_MASK)
-            ) {
-                confirmedState = state
-                buttonsConfirmedThisFrame = true
-            } else {
-                buttonsConfirmedThisFrame = false
-            }
+            buttonsConfirmedThisFrame =
+                now - pendingSinceMs >= DEBOUNCE_MS &&
+                injectableBits != (previousConfirmed.buttons and INJECTABLE_MASK)
+            if (buttonsConfirmedThisFrame) confirmedState = state
         } else {
             pendingButtons = injectableBits
-            pendingFrames = 1
+            pendingSinceMs = now
             buttonsConfirmedThisFrame = false
         }
 
@@ -787,17 +858,12 @@ class ControllerService : Service() {
             InjectionMode.UINPUT,
             InjectionMode.UHID
             -> {
-                // Combine confirmed buttons with current raw axes — the frame is atomic.
-                // Desktop / mouse mode bypasses the gamepad debounce: the trackpad touch flag
-                // (TP_RT) is capacitive and excluded from the debounce, so using confirmed
-                // buttons would freeze the cursor whenever the touch flag couldn't propagate.
-                val frameToSend =
-                    if (Prefs.getProfile(this).isMouseMode) {
-                        state
-                    } else {
-                        state.copy(buttons = confirmedState!!.buttons)
-                    }
-                uinput.pushFrame(frameToSend)
+                // Debounce mechanical buttons while passing capacitive touch flags through live.
+                // Freezing all bits at the confirmed baseline also froze the trackpad sidecar.
+                val mergedButtons =
+                    (confirmedState!!.buttons and INJECTABLE_MASK) or
+                        (state.buttons and INJECTABLE_MASK.inv())
+                uinput.pushFrame(state.copy(buttons = mergedButtons))
             }
 
             InjectionMode.SHIZUKU_INJECT -> {
@@ -811,7 +877,7 @@ class ControllerService : Service() {
                 )
                 // Buttons only on debounced change
                 if (buttonsConfirmedThisFrame) {
-                    GamepadMapper.buttons(state, confirmedState!!).forEach { (keyCode, down) ->
+                    GamepadMapper.buttons(state, previousConfirmed).forEach { (keyCode, down) ->
                         legacyInjector.injectKey(keyCode, down)
                     }
                 }
@@ -822,31 +888,55 @@ class ControllerService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
+        Diagnostics.record(TAG, "service destroyed")
+        releaseWakeLock()
+        reader?.stop()
+        // Continuous 0x8F pulse trains must be explicitly cancelled before either link closes.
         try {
-            uinput.unbind()
-        } catch (_: Throwable) {
+            usbManager.connection?.let { SteamHidProtocol.sendRumble(it, 0, 0) }
+            btManager.sendRumble(0, 0)
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to stop controller haptics during teardown: ${t.message}")
         }
         scope.cancel()
-        reader?.stop()
+
+        val teardown =
+            Thread(
+                {
+                    try {
+                        uinput.unbind()
+                    } catch (_: Throwable) {
+                    }
+                },
+                "uinput-unbind"
+            ).apply {
+                isDaemon = true
+                start()
+            }
+
         usbManager.disconnect()
         try {
             btManager.disconnect()
         } catch (_: Throwable) {
+        }
+        try {
+            teardown.join(UNBIND_TIMEOUT_MS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
         }
         _serviceStateFlow.value =
             _serviceStateFlow.value.copy(
                 mode = InjectionMode.NONE,
                 link = LinkStatus(LinkState.DISCONNECTED, "service stopped"),
                 batteryPercent = null,
-                profileId = null
+                profileId = null,
+                reportRateHz = 0
             )
         initializing = false
         initializedTransport = null
-        // Reset state + battery so MainActivity's "is the controller actually here?"
-        // observer flips back to disconnected on stop.
+        // Reset the last controller frame so MainActivity's observer flips back to disconnected.
         _stateFlow.value = null
-        _serviceStateFlow.value =
-            _serviceStateFlow.value.copy(batteryPercent = null)
         super.onDestroy()
     }
 

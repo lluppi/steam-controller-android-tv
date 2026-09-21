@@ -57,8 +57,6 @@ object Buttons {
     const val LB = 0x00080000
     const val RS_TOUCH = 0x00100000
     const val TP_RT = 0x00200000 // right trackpad touch
-    const val LT_FULL = 0x00400000 // LT full digital press (empirically suspected — V1.2)
-    const val RT_FULL = 0x00800000 // RT full digital press
 
     // byte5 (flags)
     const val LS_TOUCH = 0x01000000
@@ -67,7 +65,7 @@ object Buttons {
 
     // Right trackpad click. Identified on hardware by diffing the button mask against the touch
     // flags: bit 22 appears with touchRt set and never in the touched-but-not-clicked masks
-    // (0x30200000 vs 0x30600000, 0x32200000 vs 0x32600000). See docs/evidence/P3-S6.md.
+    // (0x30200000 vs 0x30600000, 0x32200000 vs 0x32600000).
     const val TP_RT_CLICK = 0x00400000
     const val GRIP_RT = 0x10000000
     const val GRIP_LT = 0x20000000

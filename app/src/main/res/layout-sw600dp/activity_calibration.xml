@@ -307,6 +307,13 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <include
+                    android:id="@+id/gyroControls"
+                    layout="@layout/include_gyro_controls"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp" />
+
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -376,6 +383,19 @@
                             android:text="@string/calib_trackpad_hint"
                             android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="11sp" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switchStartOnBoot"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/calib_start_on_boot" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switchStartOnConnect"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/calib_start_on_connect" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>

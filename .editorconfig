@@ -1,9 +1,0 @@
-# Kotlin style used by this fork and its upstream (IntelliJ/Android Studio defaults:
-# trailing commas absent, `;` kept inline after the last enum entry, 2-space comment gap).
-# Without this, ktlint defaults to ktlint_official and reformats whole files on save.
-[*.{kt,kts}]
-ktlint_code_style = android_studio
-
-[*.{cpp,h,hpp}]
-indent_style = space
-indent_size = 4
