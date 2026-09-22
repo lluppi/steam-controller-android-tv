@@ -144,6 +144,22 @@ class ControllerService : Service() {
     private var reader: HidReportReader? = null
     private var heartbeatJob: Job? = null
 
+    @Volatile private var activeUsbInterfaceId: Int? = null
+    private val configuredUsbInterfaces = mutableSetOf<Int>()
+
+    private class PadHapticState {
+        var touching = false
+        var clicked = false
+        var previousX = 0
+        var previousY = 0
+        var accumulatedDistance = 0.0
+        var lastSentAt = 0L
+    }
+
+    private val leftPadHaptic = PadHapticState()
+    private val rightPadHaptic = PadHapticState()
+    private var loggedUsbHapticFailure = false
+
     // Bits whose changes must pass through the debounce mechanism before being injected.
     // Mechanical switches only - the SC2026's grip squeeze sensors (GRIP_LT/RT), trackpad
     // touch flags (TP_*) and stick touch flags (LS_TOUCH/RS_TOUCH) are capacitive and
@@ -260,6 +276,13 @@ class ControllerService : Service() {
                 lastFrameAt != 0L &&
                     android.os.SystemClock.uptimeMillis() - lastFrameAt < FRAME_STALE_MS -> {
                     LinkStatus(LinkState.LINKED, "")
+                }
+
+                initializedTransport == Transport.USB -> {
+                    LinkStatus(
+                        LinkState.DISCONNECTED,
+                        "controller not connected - press Steam or switch to a paired Puck slot",
+                    )
                 }
 
                 btManager.listPairedSteamControllers().isEmpty() -> {
@@ -473,8 +496,20 @@ class ControllerService : Service() {
 
             Transport.USB -> {
                 val connection = usbManager.connection
+                val interfaceId =
+                    activeUsbInterfaceId
+                        ?: usbManager.inputPipes
+                            .firstOrNull()
+                            ?.usbInterface
+                            ?.id
                 if (connection == null ||
-                    !SteamHidProtocol.sendRumble(connection, scaledStrong, scaledWeak)
+                    interfaceId == null ||
+                    !SteamHidProtocol.sendRumble(
+                        connection,
+                        interfaceId,
+                        scaledStrong,
+                        scaledWeak,
+                    )
                 ) {
                     Log.w(TAG, "USB rumble feature report failed")
                 }
@@ -586,27 +621,49 @@ class ControllerService : Service() {
             return false
         }
         val conn = usbManager.connection!!
-        val ep = usbManager.endpointIn!!
-
-        SteamHidProtocol.disableLizardMode(conn)
-
-        heartbeatJob =
-            scope.launch(Dispatchers.IO) {
-                while (isActive) {
-                    delay(800)
-                    SteamHidProtocol.heartbeat(conn)
-                }
-            }
+        val pipes = usbManager.inputPipes
 
         reader =
             HidReportReader(
                 conn,
-                ep,
-                onReport = { state, raw -> onHidFrame(state, raw) },
+                pipes,
+                onReport = { state, raw, interfaceId ->
+                    onUsbHidFrame(conn, interfaceId, state, raw)
+                },
                 onError = { msg -> Log.e(TAG, "USB read error: $msg") },
             )
         reader?.start(scope)
         return true
+    }
+
+    private fun onUsbHidFrame(
+        connection: android.hardware.usb.UsbDeviceConnection,
+        interfaceId: Int,
+        state: SteamControllerState?,
+        raw: ByteArray,
+    ) {
+        val reportId = raw.firstOrNull()?.toInt()?.and(0xFF)
+        val controllerActive =
+            reportId == 0x42 ||
+                reportId == 0x45 ||
+                (reportId == 0x79 && raw.getOrNull(1)?.toInt()?.and(0xFF) == 0x02)
+        if (controllerActive) {
+            activeUsbInterfaceId = interfaceId
+            val needsConfiguration =
+                synchronized(configuredUsbInterfaces) {
+                    configuredUsbInterfaces.add(interfaceId)
+                }
+            if (needsConfiguration) {
+                scope.launch(Dispatchers.IO) {
+                    if (!SteamHidProtocol.disableLizardMode(connection, interfaceId)) {
+                        synchronized(configuredUsbInterfaces) {
+                            configuredUsbInterfaces.remove(interfaceId)
+                        }
+                    }
+                }
+            }
+        }
+        onHidFrame(state, raw)
     }
 
     private fun initBluetooth(): Boolean {
@@ -676,7 +733,8 @@ class ControllerService : Service() {
     ) {
         _rawReportFlow.value = raw
 
-        val isStateReport = raw.isNotEmpty() && (raw[0].toInt() and 0xFF) == 0x45
+        val reportId = raw.firstOrNull()?.toInt()?.and(0xFF)
+        val isStateReport = reportId == 0x42 || reportId == 0x45
         if (isStateReport && state != null) {
             _stateFlow.value = state
 
@@ -702,6 +760,7 @@ class ControllerService : Service() {
             }
 
             updateReportRate(nowMs)
+            if (initializedTransport == Transport.USB) updateUsbTrackpadHaptics(state, nowMs)
             handleState(state)
         }
 
@@ -716,6 +775,93 @@ class ControllerService : Service() {
                     _serviceStateFlow.value.copy(batteryPercent = status.percent)
             }
         }
+    }
+
+    private fun updateUsbTrackpadHaptics(
+        state: SteamControllerState,
+        nowMs: Long,
+    ) {
+        val interfaceId = activeUsbInterfaceId ?: return
+        val pipe =
+            usbManager.inputPipes.firstOrNull { it.usbInterface.id == interfaceId } ?: return
+        val endpoint = pipe.endpointOut ?: return
+        val connection = usbManager.connection ?: return
+
+        updateUsbTrackpadHaptic(
+            connection,
+            endpoint,
+            left = true,
+            touching = state.isButtonPressed(Buttons.TP_LT),
+            clicked = state.isButtonPressed(Buttons.TP_LT_CLICK),
+            x = state.leftPadX.toInt(),
+            y = state.leftPadY.toInt(),
+            tracker = leftPadHaptic,
+            nowMs = nowMs,
+        )
+        updateUsbTrackpadHaptic(
+            connection,
+            endpoint,
+            left = false,
+            touching = state.isButtonPressed(Buttons.TP_RT),
+            clicked = state.isButtonPressed(Buttons.TP_RT_CLICK),
+            x = state.rightPadX.toInt(),
+            y = state.rightPadY.toInt(),
+            tracker = rightPadHaptic,
+            nowMs = nowMs,
+        )
+    }
+
+    private fun updateUsbTrackpadHaptic(
+        connection: android.hardware.usb.UsbDeviceConnection,
+        endpoint: android.hardware.usb.UsbEndpoint,
+        left: Boolean,
+        touching: Boolean,
+        clicked: Boolean,
+        x: Int,
+        y: Int,
+        tracker: PadHapticState,
+        nowMs: Long,
+    ) {
+        var strongClick = false
+        var shouldSend = false
+
+        if (clicked != tracker.clicked) {
+            strongClick = true
+            shouldSend = true
+            tracker.accumulatedDistance = 0.0
+        } else if (touching && tracker.touching && !clicked) {
+            val dx = (x - tracker.previousX).toDouble()
+            val dy = (y - tracker.previousY).toDouble()
+            tracker.accumulatedDistance += kotlin.math.hypot(dx, dy)
+            if (tracker.accumulatedDistance >= 6500.0 && nowMs - tracker.lastSentAt >= 50L) {
+                shouldSend = true
+                tracker.accumulatedDistance = 0.0
+            }
+        } else if (!touching) {
+            tracker.accumulatedDistance = 0.0
+        }
+
+        if (shouldSend) {
+            val sent =
+                SteamHidProtocol.sendTrackpadHaptic(
+                    connection,
+                    endpoint,
+                    left,
+                    strongClick,
+                )
+            if (sent) {
+                tracker.lastSentAt = nowMs
+                loggedUsbHapticFailure = false
+            } else if (!loggedUsbHapticFailure) {
+                Log.w(TAG, "USB trackpad haptic output failed")
+                loggedUsbHapticFailure = true
+            }
+        }
+
+        tracker.touching = touching
+        tracker.clicked = clicked
+        tracker.previousX = x
+        tracker.previousY = y
     }
 
     private fun updateReportRate(nowMs: Long) {
@@ -859,9 +1005,18 @@ class ControllerService : Service() {
 
     private fun handleState(state: SteamControllerState) {
         if (mode == InjectionMode.NONE) return
+
+        // Virtual devices can consume the controller's already-stable HID report directly.
+        // Debouncing here added one or two full wireless frames to every button press.
+        if (mode.isVirtualDevice) {
+            confirmedState = state
+            uinput.pushFrame(state)
+            return
+        }
+
         val now = android.os.SystemClock.uptimeMillis()
 
-        // First frame = baseline
+        // First frame = baseline for the legacy event-injection fallback.
         if (confirmedState == null) {
             confirmedState = state
             pendingButtons = state.buttons and INJECTABLE_MASK
@@ -888,13 +1043,10 @@ class ControllerService : Service() {
             InjectionMode.UINPUT,
             InjectionMode.UHID,
             -> {
-                // Debounce mechanical buttons while passing capacitive touch flags through live.
-                // Freezing all bits at the confirmed baseline also froze the trackpad sidecar.
-                val mergedButtons =
-                    (confirmedState!!.buttons and INJECTABLE_MASK) or
-                        (state.buttons and INJECTABLE_MASK.inv())
-                uinput.pushFrame(state.copy(buttons = mergedButtons))
+                Unit
             }
+
+            // handled above
 
             InjectionMode.SHIZUKU_INJECT -> {
                 // Axes every frame for smoothness, with live-reloaded calibration
@@ -924,7 +1076,12 @@ class ControllerService : Service() {
         reader?.stop()
         // Continuous 0x8F pulse trains must be explicitly cancelled before either link closes.
         try {
-            usbManager.connection?.let { SteamHidProtocol.sendRumble(it, 0, 0) }
+            val interfaceId = activeUsbInterfaceId
+            if (interfaceId != null) {
+                usbManager.connection?.let {
+                    SteamHidProtocol.sendRumble(it, interfaceId, 0, 0)
+                }
+            }
             btManager.sendRumble(0, 0)
         } catch (t: Throwable) {
             Log.w(TAG, "Failed to stop controller haptics during teardown: ${t.message}")
@@ -965,6 +1122,8 @@ class ControllerService : Service() {
             )
         initializing = false
         initializedTransport = null
+        activeUsbInterfaceId = null
+        synchronized(configuredUsbInterfaces) { configuredUsbInterfaces.clear() }
         // Reset the last controller frame so MainActivity's observer flips back to disconnected.
         _stateFlow.value = null
         super.onDestroy()

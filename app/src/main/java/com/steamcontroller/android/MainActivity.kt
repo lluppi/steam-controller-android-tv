@@ -577,9 +577,7 @@ class MainActivity : AppCompatActivity() {
     private fun checkAndRequestUsb() {
         val usbManager = getSystemService(USB_SERVICE) as UsbManager
         val device =
-            usbManager.deviceList.values.firstOrNull {
-                it.vendorId == UsbConnectionManager.STEAM_VID
-            }
+            usbManager.deviceList.values.firstOrNull(UsbConnectionManager::isSupportedDevice)
 
         if (device == null) {
             log("No Steam Controller found - plug it in first")
@@ -594,8 +592,8 @@ class MainActivity : AppCompatActivity() {
                 PendingIntent.getBroadcast(
                     this,
                     0,
-                    Intent(usbPermissionAction),
-                    PendingIntent.FLAG_IMMUTABLE,
+                    Intent(usbPermissionAction).setPackage(packageName),
+                    PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 )
             usbManager.requestPermission(device, permIntent)
             log("Requesting USB permission...")
@@ -603,7 +601,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onDeviceAttached(device: UsbDevice) {
-        if (device.vendorId != UsbConnectionManager.STEAM_VID) return
+        if (!UsbConnectionManager.isSupportedDevice(device)) return
         log("Steam Controller attached")
         checkPermissionsAndStart()
     }

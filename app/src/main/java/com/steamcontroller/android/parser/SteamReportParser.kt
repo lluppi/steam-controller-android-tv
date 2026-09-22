@@ -22,7 +22,8 @@ data class BatteryStatus(
 
 object SteamReportParser {
     private const val TAG = "SteamReportParser"
-    private const val EXPECTED_REPORT_ID = 0x45
+    private const val REPORT_STATE_USB = 0x42
+    private const val REPORT_STATE_BLE = 0x45
     private const val MIN_REPORT_LEN = 40
     private const val REPORT_BATTERY_STATUS = 0x43
     private const val USB_BATTERY_REPORT_LEN = 15
@@ -38,7 +39,8 @@ object SteamReportParser {
     }
 
     /**
-     * Null when this is not a state report at all - too short, or an id other than 0x45. That
+     * Null when this is not a state report at all - too short, or an id other than the USB
+     * 0x42 and BLE 0x45 state reports. That
      * distinction matters: callers must not substitute a blank state for it, because a blank
      * state means "every axis centred, no buttons held", which is a real thing to say and not a
      * safe stand-in for "this report had no state in it".
@@ -46,8 +48,9 @@ object SteamReportParser {
     fun parse(report: ByteArray): SteamControllerState? {
         if (report.size < MIN_REPORT_LEN) return null
         val id = report[0].toInt() and 0xFF
-        if (id != EXPECTED_REPORT_ID) {
+        if (id != REPORT_STATE_USB && id != REPORT_STATE_BLE) {
             Log.v(TAG, "Unexpected report ID: 0x${id.toString(16)}")
+            return null
         }
         return doParse(report)
     }
