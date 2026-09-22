@@ -131,7 +131,7 @@ object Prefs {
 
     // ─── Output backend ──────────────────────────────────────────────────────
 
-    /** Preferred output backend — see UInputNative.Pref. AUTO lets the service pick. */
+    /** Preferred output backend - see UInputNative.Pref. AUTO lets the service pick. */
     fun getBackendPref(context: Context): Int = prefs(context).getInt(KEY_BACKEND_PREF, UInputNative.Pref.AUTO)
 
     // ─── Start on boot ───────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ object Prefs {
     /**
      * Whether the controller service starts itself at boot. On by default: this is a background
      * input service, so the cost is a notification. It cannot come up fully until Shizuku is
-     * running, which after a reboot means an adb command on Android 9 — the status card says so
+     * running, which after a reboot means an adb command on Android 9 - the status card says so
      * rather than leaving the user to guess.
      */
     fun getStartOnBoot(context: Context): Boolean = prefs(context).getBoolean(KEY_START_ON_BOOT, true)
@@ -496,7 +496,7 @@ object Prefs {
     }
 
     /** Snapshot every live preference into a new NamedProfile under `name`.
-     *  Note: transport (USB/BT) is intentionally NOT captured — it's a physical-link
+     *  Note: transport (USB/BT) is intentionally NOT captured - it's a physical-link
      *  choice, not a game-tuning one, so loading a profile shouldn't drag the user
      *  back to USB when they're docked over BT. The field stays in NamedProfile
      *  schema for backward compat with V1.2 saves but isn't written or applied. */
@@ -528,7 +528,7 @@ object Prefs {
                     .toString(),
             name = name,
             profileId = getProfile(context).id,
-            transport = 0, // unused — see captureCurrentAsProfile kdoc
+            transport = 0, // unused - see captureCurrentAsProfile kdoc
             leftCenterX = leftCal.centerX,
             leftCenterY = leftCal.centerY,
             leftDeadzone = leftCal.deadzonePercent,
@@ -557,7 +557,7 @@ object Prefs {
     }
 
     /** Apply a stored profile to the live preferences. Caller should restart the service.
-     *  Transport (USB/BT) is intentionally NOT touched — the user picks the link in
+     *  Transport (USB/BT) is intentionally NOT touched - the user picks the link in
      *  the main UI, profiles only configure the controller behaviour. */
     fun applyNamedProfile(
         context: Context,

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Pull or push RetroArch's config, with the guard that trips everyone up.
 #
-# RetroArch rewrites retroarch.cfg when it exits, so an edit made while it is running — or with
-# config_save_on_exit left on — silently disappears. This script stops RetroArch, edits, and
+# RetroArch rewrites retroarch.cfg when it exits, so an edit made while it is running - or with
+# config_save_on_exit left on - silently disappears. This script stops RetroArch, edits, and
 # verifies, in that order.
 #
 #   scripts/retroarch-cfg.sh pull            copy the config to ./retroarch.cfg
@@ -45,7 +45,7 @@ pull() {
 
 push() {
 	[ -f ./retroarch.cfg ] || {
-		echo "no ./retroarch.cfg to push — run '$0 pull' first" >&2
+		echo "no ./retroarch.cfg to push - run '$0 pull' first" >&2
 		exit 1
 	}
 	guard

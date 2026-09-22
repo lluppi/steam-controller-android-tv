@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Base (default) dimensions - phone / handheld, and the fallback for any device that is not
+  a television. values-television/dimens.xml overrides only what a 10-foot UI needs; every
+  name not overridden there is inherited from this file.
+
+  Rule: if a value differs between form factors, it belongs here and in the television
+  override - never inline in a layout. That is what lets one layout serve both.
+-->
+<resources>
+
+    <!-- ── Page ───────────────────────────────────────────────────────────────── -->
+    <dimen name="content_pad_h">20dp</dimen>
+    <dimen name="content_pad_top">16dp</dimen>
+    <dimen name="content_pad_bottom">32dp</dimen>
+    <dimen name="content_max_width">560dp</dimen>
+
+    <!-- ── Title block ─────────────────────────────────────────────────────────── -->
+    <dimen name="title_size">28sp</dimen>
+    <dimen name="subtitle_size">13sp</dimen>
+    <dimen name="title_row_gap">8dp</dimen>
+    <dimen name="title_actions_gap">10dp</dimen>
+
+    <!-- ── Rhythm ──────────────────────────────────────────────────────────────── -->
+    <dimen name="block_gap">14dp</dimen>
+    <dimen name="row_gap">10dp</dimen>
+    <dimen name="label_gap">6dp</dimen>
+
+    <!-- ── Type ────────────────────────────────────────────────────────────────── -->
+    <dimen name="label_size">11sp</dimen>
+
+    <!-- ── Cards ───────────────────────────────────────────────────────────────── -->
+    <dimen name="card_radius">18dp</dimen>
+    <dimen name="card_pad">16dp</dimen>
+    <dimen name="focus_stroke">3dp</dimen>
+
+    <!-- ── Circular icon buttons ───────────────────────────────────────────────── -->
+    <dimen name="icon_button_size">48dp</dimen>
+    <dimen name="icon_button_radius">24dp</dimen>
+    <dimen name="icon_button_glyph_pad">13dp</dimen>
+    <dimen name="icon_button_gap">8dp</dimen>
+
+    <!-- ── Hero card (controller illustration) ─────────────────────────────────── -->
+    <dimen name="hero_radius">22dp</dimen>
+    <dimen name="hero_pad">18dp</dimen>
+    <dimen name="hero_status_size">20sp</dimen>
+    <dimen name="hero_meta_size">12sp</dimen>
+    <dimen name="hero_illus_height">140dp</dimen>
+
+    <!-- ── Segmented toggle rows ───────────────────────────────────────────────── -->
+    <dimen name="segment_height">48dp</dimen>
+    <dimen name="segment_radius">14dp</dimen>
+    <dimen name="segment_text_size">13sp</dimen>
+    <dimen name="segment_icon_size">18dp</dimen>
+
+    <!-- ── The one control height ───────────────────────────────────────────────
+         Bluetooth field, Start/Stop button and the action cards all share it, so rows line up
+         without anyone having to eyeball them. -->
+    <dimen name="action_height">56dp</dimen>
+
+    <!-- ── Big Start/Stop button ───────────────────────────────────────────────── -->
+    <dimen name="big_button_height">56dp</dimen>
+    <dimen name="big_button_text_size">16sp</dimen>
+    <dimen name="big_button_radius">18dp</dimen>
+
+    <!-- ── Status pill ─────────────────────────────────────────────────────────── -->
+    <dimen name="pill_radius">14dp</dimen>
+    <dimen name="pill_pad_h">16dp</dimen>
+    <dimen name="pill_pad_v">12dp</dimen>
+    <dimen name="pill_text_size">13sp</dimen>
+
+    <!-- ── Action cards (Calibration / Mapping / Profiles / Debug) ───────────────
+         Four across, so the badge and label have to stay small enough to fit a 520dp-wide
+         phone; values-television/dimens.xml scales them back up. -->
+    <dimen name="action_pad">8dp</dimen>
+    <!-- Circle shrunk, glyph NOT: 28 - 2x5 = 18dp of glyph, exactly what the old 32dp badge
+         with a 7dp pad produced. Only the disc behind it changes size. -->
+    <dimen name="action_badge_size">28dp</dimen>
+    <dimen name="action_badge_radius">14dp</dimen>
+    <dimen name="action_glyph_pad">5dp</dimen>
+    <dimen name="action_gap">8dp</dimen>
+    <dimen name="action_label_size">12sp</dimen>
+    <dimen name="action_grid_gap">8dp</dimen>
+    <!-- Left inset of the icon inside a card. A FIXED value, not "centre the group": labels
+         are different lengths, so centring each card's group individually would put the four
+         icons at four different x positions. This pins them to one column instead. Chosen so
+         the widest label (Button mapping) still fits and the average group looks centred. -->
+    <dimen name="action_icon_inset">14dp</dimen>
+
+    <!-- ── Calibration screen ─────────────────────────────────────────────────── -->
+    <dimen name="calib_field_size">14sp</dimen>
+    <dimen name="calib_value_size">12sp</dimen>
+    <dimen name="calib_hint_size">11sp</dimen>
+    <dimen name="calib_pad_height">120dp</dimen>
+
+    <!-- ── Debug screen ─────────────────────────────────────────────────────────
+         The toolbar is shorter on a handheld; values-television/dimens.xml raises it. -->
+    <dimen name="toolbar_height">56dp</dimen>
+    <dimen name="debug_col_gap">12dp</dimen>
+    <dimen name="debug_group_gap">10dp</dimen>
+    <dimen name="debug_chip_gap">4dp</dimen>
+    <!-- Gap between chip groups inside a debug card. Separate from debug_group_gap because the
+         left column has to fit above the fold on a 540dp-tall TV screen. -->
+    <dimen name="debug_section_gap">6dp</dimen>
+    <!-- Width cap for the profiles empty-state body, so its second sentence does not run the
+         full width of the screen. -->
+    <dimen name="empty_state_max_width">360dp</dimen>
+    <dimen name="debug_axis_gap">8dp</dimen>
+
+    <!-- ── Bluetooth row ─────────────────────────────────────────────────────────
+         The picker and its refresh button share a height so the pair reads as one control row
+         rather than a field with an unrelated circle floating beside it. -->
+    <dimen name="bt_row_gap">10dp</dimen>
+    <dimen name="bt_field_height">56dp</dimen>
+    <dimen name="bt_refresh_radius">28dp</dimen>
+    <!-- The picker draws its visible outline below the top of its own bounds - Material floats
+         the hint onto the border, so the box starts about half a label-height down (measured
+         at 11px on the shield). The refresh circle is not inside that field, so without this
+         nudge its centre sits ~2.75dp above the box's centre and reads as too high.
+         Set app:hintEnabled="false" on BtField instead and this can go back to 0dp. -->
+    <dimen name="bt_refresh_nudge">3dp</dimen>
+
+</resources>

@@ -41,7 +41,7 @@ New-Item -ItemType Directory -Force -Path (Split-Path $KeystorePath -Parent) | O
 
 Write-Host ""
 Write-Host "=== Release keystore generation ===" -ForegroundColor Cyan
-Write-Host "You'll be prompted for two passwords (use the SAME for both — simpler) and identity fields."
+Write-Host "You'll be prompted for two passwords (use the SAME for both - simpler) and identity fields."
 Write-Host "REMEMBER these passwords. Losing them means losing the ability to update your app."
 Write-Host ""
 
@@ -68,4 +68,4 @@ keyAlias=$KeyAlias
 keyPassword=<your-password>
 "@ | Write-Host
 Write-Host ""
-Write-Host "Both keystore.properties and keystore/ are gitignored — they MUST stay local." -ForegroundColor Yellow
+Write-Host "Both keystore.properties and keystore/ are gitignored - they MUST stay local." -ForegroundColor Yellow

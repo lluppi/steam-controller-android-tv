@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Steam Controller</string>
-    <string name="status_disconnected">Controller disconnected</string>
-    <string name="status_ready">Controller: Ready</string>
-    <string name="status_link_lost">Controller: link lost — %1$s</string>
-    <string name="status_disconnected_reason">Controller: disconnected — %1$s</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_link_lost">Link lost - %1$s</string>
     <string name="reconnecting">Reconnecting…</string>
     <string name="shizuku_not_running">Shizuku is not running. Please start Shizuku first.</string>
     <string name="shizuku_permission_denied">Shizuku permission denied.</string>
@@ -28,37 +27,31 @@
     <string name="main_shizuku_checking">Shizuku: checking…</string>
     <string name="main_transport_usb">USB / Puck</string>
     <string name="main_transport_bt">Bluetooth</string>
-    <string name="main_controller_disconnected">Controller: disconnected</string>
-    <string name="main_battery_placeholder">Battery: —</string>
+    <string name="main_controller_disconnected">Disconnected</string>
     <string name="main_sc2026_illustration_desc">Steam Controller 2026 illustration</string>
-    <string name="main_mode_placeholder">Mode: —</string>
     <string name="main_control_mode_label">Control Mode</string>
     <string name="main_mode_gamepad">Gamepad</string>
     <string name="main_mode_desktop">Desktop</string>
     <string name="main_bt_device_hint">Bluetooth device</string>
     <string name="main_refresh_bt_desc">Refresh paired devices</string>
     <string name="main_action_calibration_title">Calibration</string>
-    <string name="main_action_calibration_desc">Calibrate sticks and rumble</string>
-    <string name="main_action_mapping_title">Button mapping</string>
-    <string name="main_action_mapping_desc">Remap button inputs</string>
-    <string name="main_action_profiles_title">Game Profiles</string>
-    <string name="main_action_profiles_desc">Save presets and auto-switch by app</string>
-    <string name="main_action_debug_desc">View low-level HID reports</string>
+    <string name="main_action_mapping_title">Mapping</string>
+    <string name="main_action_profiles_title">Profiles</string>
     <string name="main_connection_label">CONNECTION</string>
 
     <!-- ━━━━━━━━━━━━ Shizuku TV startup ━━━━━━━━━━━━ -->
     <string name="main_shizuku_open_failed">Could not open Shizuku.</string>
     <string name="main_shizuku_store_failed">Could not open a store. Install Shizuku manually from GitHub.</string>
-    <string name="shizuku_starter_service_label">Steam Controller — Shizuku starter</string>
+    <string name="shizuku_starter_service_label">Steam Controller - Shizuku starter</string>
     <string name="shizuku_starter_service_summary">Presses Shizuku\'s Start button so a TV remote is enough.</string>
     <string name="shizuku_starter_service_description">Shizuku\'s Start button cannot receive D-pad focus on Android TV. This helper sees only Shizuku and acts only briefly after you request it.</string>
     <string name="shizuku_starter_prompt_title">Let the app press Start for you</string>
-    <string name="shizuku_starter_prompt_message">Shizuku\'s Start button cannot be selected with a TV remote. Enable “Steam Controller — Shizuku starter” under Accessibility and this app will press it for you. It is restricted to Shizuku and only acts after you ask it to.</string>
+    <string name="shizuku_starter_prompt_message">Shizuku\'s Start button cannot be selected with a TV remote. Enable “Steam Controller - Shizuku starter” under Accessibility and this app will press it for you. It is restricted to Shizuku and only acts after you ask it to.</string>
     <string name="shizuku_starter_prompt_open_settings">Open Accessibility settings</string>
     <string name="shizuku_starter_prompt_open_shizuku">Just open Shizuku</string>
     <string name="shizuku_starter_armed">Opening Shizuku and pressing Start…</string>
     <string name="shizuku_starter_settings_failed">Could not open Accessibility settings.</string>
-    <string name="shizuku_starter_settings_path">Go to Device Preferences → Accessibility → Steam Controller — Shizuku starter</string>
+    <string name="shizuku_starter_settings_path">Go to Device Preferences → Accessibility → Steam Controller - Shizuku starter</string>
     <string name="autostart_channel_name">Controller auto-start</string>
     <string name="autostart_shizuku_advisory_title">Controller auto-start needs Shizuku</string>
     <string name="autostart_shizuku_advisory_text">Start Shizuku, then open Steam Controller to restore controller input.</string>
@@ -94,7 +87,7 @@
     <string name="calib_mouse_sensitivity">Mouse sensitivity</string>
     <string name="calib_trackpad_switch_label">Trackpads as mouse in gamepad mode</string>
     <string name="calib_trackpad_switch_label_tv">Trackpads as mouse (gamepad)</string>
-    <string name="calib_trackpad_hint">When ON, the right trackpad drives a cursor and the left one scrolls — alongside the gamepad.</string>
+    <string name="calib_trackpad_hint">When ON, the right trackpad drives a cursor and the left one scrolls - alongside the gamepad.</string>
     <string name="calib_start_on_boot">Start service after device boot</string>
     <string name="calib_start_on_connect">Start when controller connects</string>
     <string name="calib_slider_left_deadzone_desc">Left stick deadzone</string>
@@ -103,14 +96,14 @@
 
     <!-- ━━━━━━━━━━━━ DebugActivity ━━━━━━━━━━━━ -->
     <string name="debug_title">HID Debug</string>
-    <string name="debug_readonly_notice">Live controller state — for reference only, not interactive.</string>
+    <string name="debug_readonly_notice">Live controller state - for reference only, not interactive.</string>
     <string name="debug_face_buttons">FACE BUTTONS</string>
     <string name="debug_dpad">D-PAD</string>
     <string name="debug_bumpers_system">BUMPERS / SYSTEM</string>
     <string name="debug_sticks_pads">STICKS / PADS (clicks)</string>
     <string name="debug_sticks_pads_compact">STICKS / PADS</string>
     <string name="debug_grips_back">GRIPS / BACK</string>
-    <string name="debug_triggers_header">TRIGGERS (0–255)</string>
+    <string name="debug_triggers_header">TRIGGERS (0-255)</string>
     <string name="debug_lt">LT</string>
     <string name="debug_rt">RT</string>
     <string name="debug_sticks_header">STICKS (raw ±32767)</string>
@@ -151,13 +144,13 @@
     <string name="debug_btn_r5">R5</string>
 
     <!-- ━━━━━━━━━━━━ MappingActivity ━━━━━━━━━━━━ -->
-    <string name="mapping_title">Button mapping</string>
+    <string name="mapping_title">Mapping</string>
     <string name="mapping_hint">Tap any row to remap it. Changes apply live, no service restart needed.</string>
 
     <!-- ━━━━━━━━━━━━ ProfilesActivity ━━━━━━━━━━━━ -->
-    <string name="profiles_title">Game Profiles</string>
+    <string name="profiles_title">Profiles</string>
     <string name="profiles_empty_title">No game profiles yet</string>
-    <string name="profiles_empty_body">Tune your controller for a game, then tap Save current to keep it as a preset. Bind it to an app and we\'ll auto-switch when you launch the game.</string>
+    <string name="profiles_empty_body">Tune the controller for a game, then tap Save current to keep it as a preset.\n\nBind a preset to an app and it switches on its own when you launch that app.</string>
     <string name="profiles_save_current">Save current</string>
     <string name="profiles_active_badge">ACTIVE</string>
     <string name="profiles_load">Load</string>
@@ -172,12 +165,12 @@
     <string name="app_picker_hint">Tick every app that should auto-switch to this profile when launched.</string>
 
     <!-- ━━━━━━━━━━━━ Connection help dialog ━━━━━━━━━━━━ -->
-    <string name="help_para_puck_slots">The Steam Controller uses the right Puck slot by default. Pairing to another device will overwrite the default pairing. To maintain two pairings simultaneously, one in each slot, switch wireless modes to the left slot before completing a second pairing. Once two pairings are complete, you can switch between them at any time.</string>
-    <string name="help_para_bt_independent">The Steam Controller can also maintain a Bluetooth pairing independently of its Puck pairings.</string>
-    <string name="help_para_power_off">When powered on, the controller connects by default to the last paired connection used. To power off, hold the Steam button for ~5 seconds until you hear the chime and the LED turns off.</string>
-    <string name="help_section_wireless">To switch wireless modes:</string>
-    <string name="help_para_wireless_intro">Start with the controller turned off, then power it on with one of these combos:</string>
-    <string name="help_section_wired">To use wired USB-C:</string>
+    <string name="help_para_puck_slots">The controller uses the right Puck slot by default, and pairing it to another receiver replaces whatever is stored in that slot. To keep two Puck pairings at once, switch into left-slot wireless mode before you pair the second one. After that you can move between the two freely.</string>
+    <string name="help_para_bt_independent">A Bluetooth pairing is stored separately from the Puck slots, so it survives re-pairing either of them.</string>
+    <string name="help_para_power_off">The controller wakes into the connection it used last. To turn it off, hold the Steam button for about 5 seconds, until the chime sounds and the LED goes out.</string>
+    <string name="help_section_wireless">Switching wireless modes</string>
+    <string name="help_para_wireless_intro">Start with the controller off, then power it on holding one of these:</string>
+    <string name="help_section_wired">Wired over USB-C</string>
 
     <!-- ━━━━━━━━━━━━ Menus ━━━━━━━━━━━━ -->
     <string name="menu_reset_defaults">Reset to defaults</string>

@@ -15,10 +15,10 @@ class UsbConnectionManager(private val context: Context) {
     var endpointIn: UsbEndpoint? = null
         private set
 
-    // Interfaces claimed only to keep them away from the kernel — e.g. the Steam
+    // Interfaces claimed only to keep them away from the kernel - e.g. the Steam
     // Controller's legacy "boot keyboard" HID interface used for lizard mode. If we
     // don't claim it, Android's kernel usbhid driver binds it and creates a real,
-    // non-virtual keyboard InputDevice — which makes Android believe a hardware
+    // non-virtual keyboard InputDevice - which makes Android believe a hardware
     // keyboard is always connected and suppresses the on-screen keyboard everywhere,
     // for as long as the controller stays plugged in. Released on disconnect().
     private val heldInterfaces = mutableListOf<UsbInterface>()
@@ -57,13 +57,13 @@ class UsbConnectionManager(private val context: Context) {
         connection = conn
         endpointIn = ep
         claimRemainingInterfaces(dev, conn, iface)
-        Log.i(TAG, "Connected — PID=0x${dev.productId.toString(16).uppercase()} iface=${iface.id} ep=${ep.address} type=${ep.type}")
+        Log.i(TAG, "Connected - PID=0x${dev.productId.toString(16).uppercase()} iface=${iface.id} ep=${ep.address} type=${ep.type}")
         return true
     }
 
     // Force-claims every other interface on the device so the kernel usbhid driver
     // can't bind them behind our back (see heldInterfaces comment). We never read
-    // from these — just holding the claim is enough to keep the kernel off them.
+    // from these - just holding the claim is enough to keep the kernel off them.
     private fun claimRemainingInterfaces(dev: UsbDevice, conn: UsbDeviceConnection, dataIface: UsbInterface) {
         for (i in 0 until dev.interfaceCount) {
             val iface = dev.getInterface(i)

@@ -7,7 +7,7 @@ import kotlin.math.sqrt
 data class StickCalibration(
     val centerX: Int = 0,
     val centerY: Int = 0,
-    val deadzonePercent: Int = 8, // 0..100 — radial deadzone as % of full range
+    val deadzonePercent: Int = 8, // 0..100 - radial deadzone as % of full range
     val invertY: Boolean = false,
 ) {
     // Returns calibrated (x, y) in the same Int16 range, with deadzone applied radially.
@@ -22,7 +22,7 @@ data class StickCalibration(
         // 2. Invert Y if requested
         if (invertY) y = -y
 
-        // 3. Radial deadzone — if magnitude < deadzone, output zero;
+        // 3. Radial deadzone - if magnitude < deadzone, output zero;
         //    otherwise rescale so the deadzone edge becomes the new zero,
         //    keeping max deflection intact.
         val dz = (32767.0 * deadzonePercent / 100.0)

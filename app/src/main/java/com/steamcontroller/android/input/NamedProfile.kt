@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * A named profile snapshot — everything the user can tune, captured under a single name.
+ * A named profile snapshot - everything the user can tune, captured under a single name.
  *
  * Profiles live in SharedPreferences as a JSON array. Loading a profile overwrites the
  * matching live preference keys (profileId, transport, sticks, mappings, etc.) so the

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Segmented toggle label + icon. state_checked is the selected segment, which is the
+     only state that matters most of the time; focused follows for D-pad use. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true" android:color="@color/accent" />
+    <item android:state_focused="true" android:color="@color/accent" />
+    <item android:color="@color/text_mid" />
+</selector>

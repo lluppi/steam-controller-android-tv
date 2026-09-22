@@ -15,7 +15,7 @@ import com.steamcontroller.android.input.SteamButton
 import com.steamcontroller.android.input.XboxTarget
 
 /**
- * V1.2 — each row shows a Kenney input-prompts icon when one exists, falling back
+ * V1.2 - each row shows a Kenney input-prompts icon when one exists, falling back
  * to a colored letter chip otherwise. Source uses the white SC icon; target uses
  * the official Steam Controller colored A/B/X/Y or a neutral letter for everything
  * else. The entire row is clickable and opens a single-choice remap dialog.
@@ -221,7 +221,7 @@ class MappingActivity : AppCompatActivity() {
 
     /** Compact label for chip fallback. */
     private fun shortLabelFor(t: XboxTarget): String = when (t) {
-        XboxTarget.NONE -> "—"
+        XboxTarget.NONE -> "-"
         XboxTarget.A -> "A"
         XboxTarget.B -> "B"
         XboxTarget.X -> "X"

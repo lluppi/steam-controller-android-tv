@@ -33,12 +33,12 @@ class ControllerService : Service() {
         NONE,
         UINPUT,
         UHID,
-        SHIZUKU_INJECT
+        SHIZUKU_INJECT,
         ;
 
         /**
          * True when frames go through a real virtual input device. UINPUT and UHID are
-         * interchangeable from the app's point of view — they differ only in which kernel
+         * interchangeable from the app's point of view - they differ only in which kernel
          * interface the shell-UID service used to create the device (see cpp/output_backend.h).
          */
         val isVirtualDevice: Boolean get() = this == UINPUT || this == UHID
@@ -54,13 +54,16 @@ class ControllerService : Service() {
 
         /**
          * Connected at the Bluetooth level but no frames arriving. This is where the controller
-         * sits when it has gone to sleep, or when the GATT handshake stalled — the old UI showed
+         * sits when it has gone to sleep, or when the GATT handshake stalled - the old UI showed
          * a healthy card through both, which looks identical to a broken device.
          */
-        STALE
+        STALE,
     }
 
-    data class LinkStatus(val state: LinkState, val detail: String)
+    data class LinkStatus(
+        val state: LinkState,
+        val detail: String,
+    )
 
     companion object {
         private const val TAG = "ControllerService"
@@ -101,7 +104,7 @@ class ControllerService : Service() {
             val backend: Int = UInputNative.Backend.NONE,
             val backendDetail: String = "",
             val rumbleSupported: Boolean = true,
-            val reportRateHz: Int = 0
+            val reportRateHz: Int = 0,
         )
 
         // One flow rather than one per field: six independent flows could (and did) disagree
@@ -142,11 +145,11 @@ class ControllerService : Service() {
     private var heartbeatJob: Job? = null
 
     // Bits whose changes must pass through the debounce mechanism before being injected.
-    // Mechanical switches only — the SC2026's grip squeeze sensors (GRIP_LT/RT), trackpad
+    // Mechanical switches only - the SC2026's grip squeeze sensors (GRIP_LT/RT), trackpad
     // touch flags (TP_*) and stick touch flags (LS_TOUCH/RS_TOUCH) are capacitive and
     // inherently noisy when the controller is held; if those are mapped, the debounce
     // counter will keep resetting and the mapping will misbehave (known limitation).
-    // L4/L5/R4/R5 ARE included — they are real mechanical back-paddle switches.
+    // L4/L5/R4/R5 ARE included - they are real mechanical back-paddle switches.
     private val INJECTABLE_MASK =
         Buttons.A or Buttons.B or Buttons.X or Buttons.Y or
             Buttons.LB or Buttons.RB or
@@ -168,7 +171,7 @@ class ControllerService : Service() {
                 getSystemService(android.os.PowerManager::class.java)
                     ?.newWakeLock(
                         android.os.PowerManager.PARTIAL_WAKE_LOCK,
-                        "SteamController::bluetooth"
+                        "SteamController::bluetooth",
                     )?.apply {
                         setReferenceCounted(false)
                         acquire()
@@ -226,17 +229,18 @@ class ControllerService : Service() {
      * way.
      */
 
-    /** Shizuku's binder, defensively — the api throws when it is not ready. */
-    private fun shizukuRunning(): Boolean = try {
-        Shizuku.pingBinder()
-    } catch (_: Throwable) {
-        false
-    }
+    /** Shizuku's binder, defensively - the api throws when it is not ready. */
+    private fun shizukuRunning(): Boolean =
+        try {
+            Shizuku.pingBinder()
+        } catch (_: Throwable) {
+            false
+        }
 
     private fun refreshLinkStatus() {
         val status =
             when {
-                mode == InjectionMode.NONE ->
+                mode == InjectionMode.NONE -> {
                     if (shizukuRunning()) {
                         LinkStatus(LinkState.DISCONNECTED, "service stopped")
                     } else {
@@ -244,39 +248,45 @@ class ControllerService : Service() {
                         // pairing, so Shizuku can only be started from a PC. Say so.
                         LinkStatus(
                             LinkState.DISCONNECTED,
-                            "Shizuku is not running — after a reboot, start it from a PC (see Help)"
+                            "Shizuku is not running - after a reboot, start it from a PC (see Help)",
                         )
                     }
+                }
 
-                mode == InjectionMode.SHIZUKU_INJECT ->
-                    LinkStatus(LinkState.STALE, "inject fallback — most apps ignore input")
+                mode == InjectionMode.SHIZUKU_INJECT -> {
+                    LinkStatus(LinkState.STALE, "inject fallback - most apps ignore input")
+                }
 
                 lastFrameAt != 0L &&
-                    android.os.SystemClock.uptimeMillis() - lastFrameAt < FRAME_STALE_MS ->
+                    android.os.SystemClock.uptimeMillis() - lastFrameAt < FRAME_STALE_MS -> {
                     LinkStatus(LinkState.LINKED, "")
+                }
 
-                btManager.listPairedSteamControllers().isEmpty() ->
+                btManager.listPairedSteamControllers().isEmpty() -> {
                     LinkStatus(
                         LinkState.DISCONNECTED,
-                        "no Steam Controller paired — pair it in Bluetooth settings"
+                        "no Steam Controller paired - pair it in Bluetooth settings",
                     )
+                }
 
-                !btConnected ->
+                !btConnected -> {
                     LinkStatus(
                         LinkState.DISCONNECTED,
-                        "controller not connected — press Steam to wake it"
+                        "controller not connected - press Steam to wake it",
                     )
+                }
 
-                else ->
+                else -> {
                     LinkStatus(
                         LinkState.STALE,
-                        "link stalled — controller asleep, or hold B + R1 + Steam for a blue LED"
+                        "link stalled - controller asleep, or hold B + R1 + Steam for a blue LED",
                     )
+                }
             }
         if (_serviceStateFlow.value.link != status) {
             val message =
                 "link status: ${status.state}" +
-                    if (status.detail.isEmpty()) "" else " — ${status.detail}"
+                    if (status.detail.isEmpty()) "" else " - ${status.detail}"
             Log.i(TAG, message)
             Diagnostics.record(TAG, message)
         }
@@ -288,7 +298,7 @@ class ControllerService : Service() {
                         _serviceStateFlow.value.reportRateHz
                     } else {
                         0
-                    }
+                    },
             )
     }
 
@@ -332,7 +342,7 @@ class ControllerService : Service() {
         if (current == lastForegroundPackage) return
         Log.v(TAG, "Foreground changed: $lastForegroundPackage → $current")
         lastForegroundPackage = current
-        // Ignore self — opening our own UI shouldn't trigger anything.
+        // Ignore self - opening our own UI shouldn't trigger anything.
         if (current == packageName) return
 
         val bound =
@@ -351,13 +361,13 @@ class ControllerService : Service() {
         val liveProfileMatches = Prefs.getProfile(this).id == bound.profileId
         val activeMatches = Prefs.getActiveNamedProfileId(this) == bound.id
         if (activeMatches && liveProfileMatches) {
-            Log.v(TAG, "  '${bound.name}' already applied — skipping")
+            Log.v(TAG, "  '${bound.name}' already applied - skipping")
             return
         }
 
         Log.i(
             TAG,
-            "Auto-switch → '${bound.name}' (foreground=$current, activeMatches=$activeMatches, liveMatches=$liveProfileMatches)"
+            "Auto-switch → '${bound.name}' (foreground=$current, activeMatches=$activeMatches, liveMatches=$liveProfileMatches)",
         )
         Prefs.applyNamedProfile(this, bound)
         announceProfileLoaded(bound.name)
@@ -387,7 +397,7 @@ class ControllerService : Service() {
     /**
      * Surface the auto-switch to the user via:
      *  1. A LENGTH_LONG Toast on the main thread (cheapest signal, shows over the
-     *     launching app — might be missed if the user is head-down, hence #2).
+     *     launching app - might be missed if the user is head-down, hence #2).
      *  2. The foreground-service notification text gets the profile name appended
      *     (persistent until the next swap), so the user can always pull the shade
      *     to confirm which preset is live.
@@ -400,7 +410,7 @@ class ControllerService : Service() {
                 .makeText(
                     applicationContext,
                     "Game Profile loaded: $profileName",
-                    android.widget.Toast.LENGTH_LONG
+                    android.widget.Toast.LENGTH_LONG,
                 ).show()
         }
         // Notification refresh happens via refreshNotification() in the caller
@@ -434,7 +444,10 @@ class ControllerService : Service() {
      * Throttled: we re-send at most every 50ms if the magnitudes change, or every
      * 200ms if they're the same (keep-alive for long-lasting effects).
      */
-    private fun forwardRumble(strong: Int, weak: Int) {
+    private fun forwardRumble(
+        strong: Int,
+        weak: Int,
+    ) {
         // Apply user-configured intensity (0..100% of game-requested magnitude)
         val intensity = Prefs.getRumbleIntensity(this)
         val scaledStrong = (strong * intensity / 100).coerceIn(0, 0xFFFF)
@@ -451,7 +464,7 @@ class ControllerService : Service() {
 
         Log.v(
             TAG,
-            "Rumble → controller: strong=$scaledStrong weak=$scaledWeak (intensity=$intensity%)"
+            "Rumble → controller: strong=$scaledStrong weak=$scaledWeak (intensity=$intensity%)",
         )
         when (Prefs.getTransport(this)) {
             Transport.BLUETOOTH -> {
@@ -469,7 +482,11 @@ class ControllerService : Service() {
         }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         if (intent?.action == ACTION_STOP || intent?.action == ACTION_RESTART) {
             // Only an explicit Stop disarms controller-connect auto-start. Reconnect and internal
             // failures must stay armed so a failed retry does not disable future auto-starts.
@@ -497,7 +514,7 @@ class ControllerService : Service() {
             startForeground(
                 NOTIFICATION_ID,
                 buildNotification(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
             )
         } else {
             startForeground(NOTIFICATION_ID, buildNotification())
@@ -511,7 +528,7 @@ class ControllerService : Service() {
                 intent?.getParcelableExtra(EXTRA_DEVICE)
             }
 
-        // A duplicate start must be a no-op — see the fields above. A start for a *different*
+        // A duplicate start must be a no-op - see the fields above. A start for a *different*
         // transport is a deliberate restart (the UI tells the user to restart to apply a transport
         // change), so that one is allowed through.
         val requestedTransport = Prefs.getTransport(this)
@@ -521,7 +538,7 @@ class ControllerService : Service() {
             Log.i(
                 TAG,
                 "Ignoring duplicate start (initializing=$initializing, mode=$mode, " +
-                    "transport=$requestedTransport)"
+                    "transport=$requestedTransport)",
             )
             return START_STICKY
         }
@@ -586,7 +603,7 @@ class ControllerService : Service() {
                 conn,
                 ep,
                 onReport = { state, raw -> onHidFrame(state, raw) },
-                onError = { msg -> Log.e(TAG, "USB read error: $msg") }
+                onError = { msg -> Log.e(TAG, "USB read error: $msg") },
             )
         reader?.start(scope)
         return true
@@ -625,15 +642,12 @@ class ControllerService : Service() {
 
         btManager.connect(
             device,
-            onReport = { raw ->
-                val state = SteamReportParser.parse(raw) ?: SteamReportParser.parseRaw(raw)
-                onHidFrame(state, raw)
-            },
+            onReport = { raw -> onHidFrame(SteamReportParser.parse(raw), raw) },
             onConnectionChange = { connected ->
                 btConnected = connected
                 Log.i(TAG, "BT connection state: $connected")
                 refreshLinkStatus()
-            }
+            },
         )
 
         heartbeatJob =
@@ -646,45 +660,61 @@ class ControllerService : Service() {
         return true
     }
 
-    private fun onHidFrame(state: SteamControllerState, raw: ByteArray) {
-        _stateFlow.value = state
+    /**
+     * One HID report off the wire.
+     *
+     * [state] is null whenever the report is not a state report - a short id-0x43 battery
+     * status, or the 5-byte ack the controller sends back for each heartbeat write. Those used
+     * to arrive here as a SteamControllerState() with every field zero, which was published to
+     * _stateFlow: the calibration readout snapped to 0 and back a couple of times a second, and
+     * anything else watching that flow saw a controller with centred sticks. The raw bytes still
+     * flow through so the debug screen can display them; no state is invented for them.
+     */
+    private fun onHidFrame(
+        state: SteamControllerState?,
+        raw: ByteArray,
+    ) {
         _rawReportFlow.value = raw
 
-        // Frames are the proof of life. Flip to LINKED immediately rather than waiting for the
-        // ticker, so a reconnected controller goes green the moment it starts talking.
-        lastFrameAt = android.os.SystemClock.uptimeMillis()
-        if (_serviceStateFlow.value.link.state != LinkState.LINKED) refreshLinkStatus()
+        val isStateReport = raw.isNotEmpty() && (raw[0].toInt() and 0xFF) == 0x45
+        if (isStateReport && state != null) {
+            _stateFlow.value = state
 
-        // Diagnostic: the left trackpad click does not show up in the button field at all (the
-        // mask is unchanged across left-pad clicks), so dump the whole state report whenever the
-        // mask changes. Diffing these against a click identifies the byte that carries it.
-        val nowMs = android.os.SystemClock.uptimeMillis()
-        if (BuildConfig.DEBUG &&
-            (state.buttons != lastRawLogButtons || nowMs - lastRawLogMs > 5000L)
-        ) {
-            lastRawLogButtons = state.buttons
-            lastRawLogMs = nowMs
-            Log.i(
-                TAG,
-                "raw[${raw.size}] mask=0x${state.buttons.toString(16)} " +
-                    raw.joinToString(" ") { "%02x".format(it) }
-            )
+            // Frames are the proof of life. Flip to LINKED immediately rather than waiting for
+            // the ticker, so a reconnected controller goes green the moment it starts talking.
+            val nowMs = android.os.SystemClock.uptimeMillis()
+            lastFrameAt = nowMs
+            if (_serviceStateFlow.value.link.state != LinkState.LINKED) refreshLinkStatus()
+
+            // Diagnostic: the left trackpad click does not show up in the button field at all
+            // (the mask is unchanged across left-pad clicks), so dump the whole state report
+            // whenever the mask changes. Diffing these against a click identifies the byte.
+            if (BuildConfig.DEBUG &&
+                (state.buttons != lastRawLogButtons || nowMs - lastRawLogMs > 5000L)
+            ) {
+                lastRawLogButtons = state.buttons
+                lastRawLogMs = nowMs
+                Log.i(
+                    TAG,
+                    "raw[${raw.size}] mask=0x${state.buttons.toString(16)} " +
+                        raw.joinToString(" ") { "%02x".format(it) },
+                )
+            }
+
+            updateReportRate(nowMs)
+            handleState(state)
         }
 
-        // Dedicated battery/charge report (id 0x43) — works on both USB and BT,
-        // percent is already 0-100. Sole battery source: bytes 44-45 of the 0x45 state
-        // report were assumed to be a static battery field but turned out to be live,
-        // fast-changing data (empirically: flickers 0%/99% on USB), so that guess isn't used.
+        // Dedicated battery/charge report (id 0x43) - works on both USB and BT, percent is
+        // already 0-100. Deliberately outside the state-report branch: this is the report that
+        // carries no state at all. Sole battery source: bytes 44-45 of the 0x45 state report
+        // were assumed to be a static battery field but turned out to be live, fast-changing
+        // data (empirically: flickers 0%/99% on USB), so that guess isn't used.
         SteamReportParser.parseBatteryStatus(raw)?.let { status ->
             if (_serviceStateFlow.value.batteryPercent != status.percent) {
                 _serviceStateFlow.value =
                     _serviceStateFlow.value.copy(batteryPercent = status.percent)
             }
-        }
-
-        if (raw.isNotEmpty() && (raw[0].toInt() and 0xFF) == 0x45) {
-            updateReportRate(nowMs)
-            handleState(state)
         }
     }
 
@@ -712,11 +742,11 @@ class ControllerService : Service() {
                 delay(150)
             }
             // Published before setMode() so the UI label can read both when the mode
-            // change reaches it — see MainActivity.refreshModeLabel().
+            // change reaches it - see MainActivity.refreshModeLabel().
             _serviceStateFlow.value =
                 _serviceStateFlow.value.copy(
                     backend = uinput.backendId,
-                    backendDetail = uinput.backendDetail
+                    backendDetail = uinput.backendDetail,
                 )
             if (uinput.isReady) {
                 setMode(
@@ -724,26 +754,26 @@ class ControllerService : Service() {
                         InjectionMode.UHID
                     } else {
                         InjectionMode.UINPUT
-                    }
+                    },
                 )
                 Log.i(
                     TAG,
                     "Using ${UInputNative.backendName(uinput.backendId)} virtual gamepad " +
                         "(${Prefs.getProfile(
-                            this@ControllerService
-                        ).displayName}) — ${uinput.backendDetail}"
+                            this@ControllerService,
+                        ).displayName}) - ${uinput.backendDetail}",
                 )
                 return
             }
             Log.w(
                 TAG,
-                "No virtual output backend (${uinput.backendDetail}), falling back to inject"
+                "No virtual output backend (${uinput.backendDetail}), falling back to inject",
             )
             uinput.unbind()
         } catch (t: Throwable) {
             _serviceStateFlow.value =
                 _serviceStateFlow.value.copy(
-                    backendDetail = "virtual output error: ${t.message}"
+                    backendDetail = "virtual output error: ${t.message}",
                 )
             Log.w(TAG, "virtual output bind failed: ${t.message}, falling back to inject")
         }
@@ -761,11 +791,11 @@ class ControllerService : Service() {
     private fun setMode(newMode: InjectionMode) {
         mode = newMode
         // Rumble travels over force feedback from the virtual device, which only the uinput
-        // backend implements — and only while that device is actually alive.
+        // backend implements - and only while that device is actually alive.
         _serviceStateFlow.value =
             _serviceStateFlow.value.copy(
                 mode = newMode,
-                rumbleSupported = newMode.isVirtualDevice && uinput.rumbleSupported
+                rumbleSupported = newMode.isVirtualDevice && uinput.rumbleSupported,
             )
         refreshNotification()
     }
@@ -804,7 +834,7 @@ class ControllerService : Service() {
         pendingButtons = 0
         pendingSinceMs = 0L
 
-        // Run the actual device teardown/recreate off the service main thread —
+        // Run the actual device teardown/recreate off the service main thread -
         // it's a blocking binder + native ioctl pair that can take 100ms+.
         // Doing it on the main thread risks ANR / lost broadcast intents and was
         // the most likely cause of the "I can't change profile until I reboot" bug.
@@ -815,7 +845,7 @@ class ControllerService : Service() {
                     if (!ok) {
                         Log.w(
                             TAG,
-                            "switchProfile failed; the gamepad may need a service restart"
+                            "switchProfile failed; the gamepad may need a service restart",
                         )
                     }
                 }
@@ -856,7 +886,7 @@ class ControllerService : Service() {
 
         when (mode) {
             InjectionMode.UINPUT,
-            InjectionMode.UHID
+            InjectionMode.UHID,
             -> {
                 // Debounce mechanical buttons while passing capacitive touch flags through live.
                 // Freezing all bits at the confirmed baseline also froze the trackpad sidecar.
@@ -872,8 +902,8 @@ class ControllerService : Service() {
                     GamepadMapper.axes(
                         state,
                         Prefs.getLeftCalibration(this),
-                        Prefs.getRightCalibration(this)
-                    )
+                        Prefs.getRightCalibration(this),
+                    ),
                 )
                 // Buttons only on debounced change
                 if (buttonsConfirmedThisFrame) {
@@ -909,7 +939,7 @@ class ControllerService : Service() {
                     } catch (_: Throwable) {
                     }
                 },
-                "uinput-unbind"
+                "uinput-unbind",
             ).apply {
                 isDaemon = true
                 start()
@@ -931,7 +961,7 @@ class ControllerService : Service() {
                 link = LinkStatus(LinkState.DISCONNECTED, "service stopped"),
                 batteryPercent = null,
                 profileId = null,
-                reportRateHz = 0
+                reportRateHz = 0,
             )
         initializing = false
         initializedTransport = null
@@ -947,7 +977,7 @@ class ControllerService : Service() {
             NotificationChannel(
                 CHANNEL_ID,
                 getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_LOW,
             ).apply {
                 description = "Shows controller status and active emulation profile"
                 setShowBadge(false)
@@ -964,7 +994,7 @@ class ControllerService : Service() {
         val modeText =
             when (mode) {
                 InjectionMode.UINPUT,
-                InjectionMode.UHID
+                InjectionMode.UHID,
                 -> getString(R.string.notif_mode_uinput, profile.displayName)
 
                 InjectionMode.SHIZUKU_INJECT -> getString(R.string.notif_mode_inject)
@@ -991,7 +1021,7 @@ class ControllerService : Service() {
                 this,
                 0,
                 openIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
 
         val stopIntent =
@@ -999,7 +1029,7 @@ class ControllerService : Service() {
                 this,
                 1,
                 Intent(this, ControllerService::class.java).apply { action = ACTION_STOP },
-                PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_IMMUTABLE,
             )
         val stopAction =
             Notification.Action
@@ -1007,7 +1037,7 @@ class ControllerService : Service() {
                     android.graphics.drawable.Icon
                         .createWithResource(this, android.R.drawable.ic_media_pause),
                     getString(android.R.string.cancel),
-                    stopIntent
+                    stopIntent,
                 ).build()
 
         // "Switch profile" action: cycles to the next emulated controller (virtual devices only).
@@ -1016,7 +1046,7 @@ class ControllerService : Service() {
                 this,
                 2,
                 Intent(this, ControllerService::class.java).apply { action = ACTION_NEXT_PROFILE },
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
         val nextLabel =
             if (mode.isVirtualDevice) {
@@ -1034,13 +1064,13 @@ class ControllerService : Service() {
                     android.graphics.drawable.Icon
                         .createWithResource(this, android.R.drawable.ic_menu_rotate),
                     nextLabel,
-                    nextProfileIntent
+                    nextProfileIntent,
                 ).build()
 
         val icon =
             when (mode) {
                 InjectionMode.UINPUT,
-                InjectionMode.UHID
+                InjectionMode.UHID,
                 -> android.R.drawable.ic_media_play
 
                 InjectionMode.SHIZUKU_INJECT -> android.R.drawable.ic_media_play
@@ -1060,7 +1090,7 @@ class ControllerService : Service() {
                 .setShowWhen(false)
                 .setCategory(Notification.CATEGORY_SERVICE)
 
-        // Only show the switch action when a virtual device is active — pointless in fallback or starting
+        // Only show the switch action when a virtual device is active - pointless in fallback or starting
         if (mode.isVirtualDevice) {
             builder.addAction(switchAction)
         }

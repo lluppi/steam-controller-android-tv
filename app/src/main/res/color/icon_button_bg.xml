@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- GitHub / Help circle BACKGROUND.
+     These two files were previously swapped with icon_button_stroke, which meant the circle
+     filled with @color/accent on focus - the same colour as the glyph's focused tint, so the
+     icon vanished into its own background. Dark surface on focus, bright ring on the stroke. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:color="@color/accent_container" />
+    <item android:state_pressed="true" android:color="@color/accent_container" />
+    <item android:color="@color/surface_2" />
+</selector>

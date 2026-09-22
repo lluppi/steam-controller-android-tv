@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Adaptive icon foreground layer — same controller silhouette as ic_launcher.xml, scaled
+<!-- Adaptive icon foreground layer - same controller silhouette as ic_launcher.xml, scaled
      down (0.62x, pivot on center) so it stays within the ~66dp safe zone that every OEM
      launcher mask (circle, squircle, rounded square...) guarantees to keep visible. The flat
      ic_launcher.xml art fills the full 108dp canvas edge-to-edge, which One UI's mask clips. -->

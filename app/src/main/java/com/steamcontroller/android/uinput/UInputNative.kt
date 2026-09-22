@@ -2,7 +2,7 @@ package com.steamcontroller.android.uinput
 
 // Thin JNI binding. Loaded by the Shizuku user service process (UID shell).
 //
-// The class name is historical: this fronts every output backend — `uinput` when the
+// The class name is historical: this fronts every output backend - `uinput` when the
 // shell UID may open /dev/uinput, `uhid` otherwise. Which one is in use is decided by
 // selectBackend(). See cpp/output_backend.h for the contract.
 object UInputNative {
@@ -10,21 +10,21 @@ object UInputNative {
         System.loadLibrary("uinput_jni")
     }
 
-    /** Chosen backend — must match BackendId in cpp/output_backend.h. */
+    /** Chosen backend - must match BackendId in cpp/output_backend.h. */
     object Backend {
         const val NONE = 0
         const val UINPUT = 1
         const val UHID = 2
     }
 
-    /** Requested backend for [selectBackend] — must match BackendPref in cpp/output_backend.h. */
+    /** Requested backend for [selectBackend] - must match BackendPref in cpp/output_backend.h. */
     object Pref {
         const val AUTO = 0
         const val UINPUT = 1
         const val UHID = 2
     }
 
-    /** Display name for a [Backend] id — used in logs and the UI. */
+    /** Display name for a [Backend] id - used in logs and the UI. */
     fun backendName(id: Int): String = when (id) {
         Backend.UINPUT -> "uinput"
         Backend.UHID -> "uhid"

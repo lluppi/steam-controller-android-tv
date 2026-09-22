@@ -32,7 +32,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
 
     companion object {
         // Sentinel meaning "the setting had no value before we touched it" (settings get
-        // returns "null" as a string in that case) — restored by deleting the key, not by
+        // returns "null" as a string in that case) - restored by deleting the key, not by
         // writing the literal string "null".
         private const val SHOW_IME_UNSET_SENTINEL = "__unset__"
         private const val ACTION_LAYER_HOLD_MS = 250L
@@ -94,7 +94,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     }
 
     // Button state of the last sidecar/desktop frame sent. Tracked so an all-quiet frame
-    // can be dropped without dropping the frame that *releases* the last key — comparing
+    // can be dropped without dropping the frame that *releases* the last key - comparing
     // against zero instead would leave a released key stuck down in the kernel.
     private var lastSentKeys: Int = 0
 
@@ -108,7 +108,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
 
     @Volatile private var rumbleThreadRunning = false
 
-    // Calibration + mapping cache — refreshed every refreshIntervalMs instead of every frame
+    // Calibration + mapping cache - refreshed every refreshIntervalMs instead of every frame
     @Volatile private var cachedLeftCal: StickCalibration = StickCalibration.DEFAULT
 
     @Volatile private var cachedRightCal: StickCalibration = StickCalibration.DEFAULT
@@ -174,14 +174,14 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
                 val svc = IUInputService.Stub.asInterface(binder)
                 service = svc
                 Log.i(TAG, "UInputService connected")
-                // Binder calls can block — do them off the main thread
+                // Binder calls can block - do them off the main thread
                 Thread {
                     try {
                         val backend = svc.selectBackend(Prefs.getBackendPref(context))
                         backendId = backend
                         backendDetail = svc.getBackendDetail() ?: ""
                         rumbleSupported = svc.supportsRumble()
-                        Log.i(TAG, "backend=${UInputNative.backendName(backend)} — $backendDetail")
+                        Log.i(TAG, "backend=${UInputNative.backendName(backend)} - $backendDetail")
                         if (backend == UInputNative.Backend.NONE) {
                             Log.e(TAG, "No usable input backend on this device")
                         } else {
@@ -200,10 +200,10 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
                 service = null
                 deviceReady = false
                 // Critical: without this, bind() short-circuits on `if (bound) return` forever and the
-                // app can never re-establish its user service — a killed service used to leave it
+                // app can never re-establish its user service - a killed service used to leave it
                 // permanently unable to create devices, with no way back except restarting the app.
                 bound = false
-                Log.w(TAG, "UInputService disconnected — will re-bind on the next start")
+                Log.w(TAG, "UInputService disconnected - will re-bind on the next start")
             }
 
             // API 26+: the binding died, or connected to nothing. Same recovery as above.
@@ -211,7 +211,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
                 service = null
                 deviceReady = false
                 bound = false
-                Log.w(TAG, "UInputService binding died — will re-bind on the next start")
+                Log.w(TAG, "UInputService binding died - will re-bind on the next start")
             }
 
             override fun onNullBinding(name: ComponentName?) {
@@ -298,7 +298,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
 
     /**
      * Poll the user service for FF (rumble) events triggered by games.
-     * Runs at 50 Hz — Android emits FF events at the game's frame rate (~60 Hz)
+     * Runs at 50 Hz - Android emits FF events at the game's frame rate (~60 Hz)
      * so this is fast enough without burning binder calls.
      */
     private fun startRumbleThread() {
@@ -445,7 +445,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         }
         lastSourceButtons = sourceButtons
 
-        // SC2026 sticks are already in Int16 range — direct passthrough
+        // SC2026 sticks are already in Int16 range - direct passthrough
         // SC2026 triggers are 0-32767 → scale down to Xbox 0-255.
         // ltOverride/rtOverride bump the axis to max when a remapped source is pressed.
         val ltAnalog = (state.leftTrigger * 255 / 32767).coerceIn(0, 255)
@@ -519,7 +519,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
 
     /**
      * Sidecar frame for gamepad mode: trackpad-as-mouse + keyboard targets for
-     * back paddles. Skips emitting anything when nothing happens this frame —
+     * back paddles. Skips emitting anything when nothing happens this frame -
      * keeping the mouse fd idle is critical so Android IME focus isn't stolen by
      * a phantom cursor (same rationale as in Desktop mode).
      */
@@ -581,7 +581,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
      * native sendMouseFrame). It compares against the last *sent* state rather than against zero,
      * so the frame that releases a key is never the one that gets skipped.
      *
-     * Shared by both mouse modes — they differ only in how `keys` was built.
+     * Shared by both mouse modes - they differ only in how `keys` was built.
      */
     private fun sendMouseFrameIfChanged(
         svc: IUInputService,
@@ -595,7 +595,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         lastSentKeys = keys
         if (BuildConfig.DEBUG && keys != 0) {
             // The exact key mask handed to the native layer. "The left pad emits a click" was
-            // twice inferred from the button mask and twice wrong — this is the authoritative
+            // twice inferred from the button mask and twice wrong - this is the authoritative
             // record of what was actually transmitted.
             Log.i(TAG, "mouse frame: keys=0x${keys.toString(16)} mask=0x${mask.toString(16)}")
         }
@@ -707,7 +707,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
             keys = keys or (1 shl MouseTarget.BTN_RIGHT.bit)
         }
 
-        // Special actions (screenshot) still honoured via the gamepad mapping table —
+        // Special actions (screenshot) still honoured via the gamepad mapping table -
         // keeps QA → screenshot working even in mouse mode.
         for ((source, target) in cachedDesktopMapping) {
             if (target.mask < 0 && target.keyBit < 0 && target.triggerSide == 0) {

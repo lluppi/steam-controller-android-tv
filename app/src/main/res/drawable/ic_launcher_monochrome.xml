@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Adaptive icon monochrome layer (Android 13+ themed icons, e.g. One UI "Themed icons").
      Without this, the OS auto-derives a themed silhouette from the foreground/legacy icon,
-     which is what was clipping on One UI. Same geometry as ic_launcher_foreground.xml — the
+     which is what was clipping on One UI. Same geometry as ic_launcher_foreground.xml - the
      OS applies its own tint, so the fill color here is irrelevant as long as it's opaque. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"

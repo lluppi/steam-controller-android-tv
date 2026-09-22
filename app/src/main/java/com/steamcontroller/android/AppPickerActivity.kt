@@ -87,7 +87,7 @@ class AppPickerActivity : AppCompatActivity() {
     /**
      * Returns every app the launcher would normally show. Filters by intent CATEGORY_LAUNCHER
      * (or LEANBACK_LAUNCHER on Android TV) so the list is the same one the user sees on their
-     * home screen — no system services or background-only packages.
+     * home screen - no system services or background-only packages.
      */
     private fun queryLauncherApps(): List<AppEntry> {
         val pm = packageManager

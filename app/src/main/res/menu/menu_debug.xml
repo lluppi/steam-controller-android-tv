@@ -2,8 +2,10 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <!-- Shares a bounded support log without exposing raw HID reports. -->
+    <!-- In the overflow like every other screen's secondary action, rather than pinned into
+         the toolbar as a bare text button. -->
     <item
         android:id="@+id/action_log_to_file"
         android:title="@string/menu_log_to_file"
-        app:showAsAction="always" />
+        app:showAsAction="never" />
 </menu>

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Big Start/Stop button fill. Unfocused is a dark accent wash so the focused state -
+     full-brightness cyan - has somewhere to go. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true" android:color="@color/action_fill_focused" />
     <item android:state_pressed="true" android:color="@color/action_fill_focused" />

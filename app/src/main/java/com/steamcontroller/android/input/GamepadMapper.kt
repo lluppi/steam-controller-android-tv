@@ -10,7 +10,7 @@ object GamepadMapper {
     private const val JOY_MAX = 32767f
     private const val TRIG_MAX = 32767f // triggers are 16-bit 0-32767
 
-    // Axes only — called every frame for smooth analog input.
+    // Axes only - called every frame for smooth analog input.
     // Optional calibration applied if provided (uinput path supplies its own; legacy passes null).
     fun axes(
         state: SteamControllerState,
@@ -31,7 +31,7 @@ object GamepadMapper {
         )
     }
 
-    // Buttons only — compared against confirmed (debounced) state
+    // Buttons only - compared against confirmed (debounced) state
     fun buttons(
         current: SteamControllerState,
         confirmed: SteamControllerState

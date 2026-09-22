@@ -17,7 +17,7 @@ import org.json.JSONObject
  * so there's no automatic Android Backup Service coverage to rely on).
  *
  * Import is additive for Game Profiles (upsert by id via Prefs.saveNamedProfile) rather than
- * a destructive replace — restoring onto a fresh install behaves like a full restore, while
+ * a destructive replace - restoring onto a fresh install behaves like a full restore, while
  * restoring onto an existing install just merges in whatever the backup had.
  */
 object BackupManager {

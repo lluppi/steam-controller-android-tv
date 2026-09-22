@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Steam Input — sd_button_view.svg (Steam Deck View). -->
+<!-- Steam Input - sd_button_view.svg (Steam Deck View). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="36dp" android:height="36dp"
     android:viewportWidth="32" android:viewportHeight="32">

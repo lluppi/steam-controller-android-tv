@@ -177,7 +177,7 @@ class ProfilesActivity : AppCompatActivity() {
      * Explicitly force-shows the IME instead of relying on Android's auto-show-on-focus
      * heuristic. While the emulated gamepad is connected (esp. over Bluetooth), Android/OEM
      * skins can classify the physical controller as a hardware keyboard/mouse and suppress
-     * auto-show entirely — SHOW_FORCED bypasses that heuristic instead of fighting it via
+     * auto-show entirely - SHOW_FORCED bypasses that heuristic instead of fighting it via
      * system Settings, which is fragile and OEM-dependent.
      */
     private fun showKeyboardFor(input: EditText) {

@@ -10,13 +10,13 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/selectableItemBackground"
+    android:background="@drawable/row_bg"
     android:clickable="true"
     android:focusable="true"
     android:gravity="center_vertical"
     android:minHeight="60dp"
     android:orientation="horizontal"
-    android:paddingHorizontal="2dp"
+    android:paddingHorizontal="16dp"
     android:paddingVertical="6dp">
 
     <!-- ── Source SC button ─────────────────────────────────────────────── -->
@@ -40,7 +40,7 @@
             android:backgroundTint="@color/btn_neutral"
             android:fontFamily="monospace"
             android:gravity="center"
-            android:textColor="#0E1A22"
+            android:textColor="@color/on_badge"
             android:textSize="13sp"
             android:textStyle="bold"
             tools:text="A" />
@@ -77,7 +77,7 @@
             android:backgroundTint="@color/btn_xbox_a"
             android:fontFamily="monospace"
             android:gravity="center"
-            android:textColor="#0E1A22"
+            android:textColor="@color/on_badge"
             android:textSize="13sp"
             android:textStyle="bold"
             tools:text="A" />

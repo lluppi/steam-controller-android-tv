@@ -27,7 +27,7 @@ mkdir -p "$(dirname "$KEYSTORE_PATH")"
 cat <<EOF
 
 === Release keystore generation ===
-You'll be prompted for two passwords (use the SAME for both — simpler) and identity fields.
+You'll be prompted for two passwords (use the SAME for both - simpler) and identity fields.
 REMEMBER these passwords. Losing them means losing the ability to update your app.
 
 EOF
@@ -50,5 +50,5 @@ storePassword=<your-password>
 keyAlias=$KEY_ALIAS
 keyPassword=<your-password>
 
-Both keystore.properties and keystore/ are gitignored — they MUST stay local.
+Both keystore.properties and keystore/ are gitignored - they MUST stay local.
 EOF

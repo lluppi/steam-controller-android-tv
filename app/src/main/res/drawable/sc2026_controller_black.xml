@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Official SC2026 controller silhouette (black variant — for use on light backgrounds).
+  Official SC2026 controller silhouette (black variant - for use on light backgrounds).
   Source: SC2026 - Black.svg, viewBox 0 0 503.84 364.21.
   Use android:tint="@color/..." to recolor as needed.
 -->

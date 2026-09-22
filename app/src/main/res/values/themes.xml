@@ -1,30 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Always dark, deliberately NOT a DayNight parent: the palette below is a fixed dark
-         one, so DayNight was a bug. When the device is not in night mode it resolves to the
-         LIGHT scheme, and anything that falls back to android:textColorPrimary — or the
-         light-mode ripple / focus-highlight colours — then renders dark-on-dark. This is an
-         Android TV UI that has no light variant. -->
+    <!-- Always dark, deliberately NOT a DayNight parent: this is an Android TV UI with no
+         light variant, and a DayNight parent resolves to the light scheme unless night mode
+         happens to be on, which repaints every fallback (text, ripples, focus highlights)
+         wrong. Every Material token the app touches is therefore stated explicitly. -->
     <style name="Theme.SteamController" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="colorPrimary">#66C0F4</item>
-        <item name="colorOnPrimary">#000000</item>
-        <item name="colorPrimaryContainer">#2A475E</item>
-        <item name="colorOnPrimaryContainer">#FFFFFF</item>
-        <item name="colorSecondary">#66C0F4</item>
-        <item name="colorOnSecondary">#000000</item>
-        <item name="colorSurface">#1B2838</item>
-        <item name="colorOnSurface">#FFFFFF</item>
-        <item name="colorSurfaceVariant">#2A475E</item>
-        <item name="colorOnSurfaceVariant">#C6D4DF</item>
+
+        <!-- Accent -->
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorOnPrimary">@color/accent_on</item>
+        <item name="colorPrimaryContainer">@color/accent_container</item>
+        <item name="colorOnPrimaryContainer">@color/accent_on_container</item>
+
+        <!-- Secondary: Steam blue, used for the action-card icon badges. -->
+        <item name="colorSecondary">@color/accent_dim</item>
+        <item name="colorOnSecondary">@color/accent_on</item>
+        <item name="colorSecondaryContainer">@color/surface_3</item>
+        <item name="colorOnSecondaryContainer">@color/accent_on_container</item>
+
+        <!-- Tertiary: mint, for "live" affordances. -->
+        <item name="colorTertiary">@color/ok_on_container</item>
+        <item name="colorOnTertiary">@color/accent_on</item>
+        <item name="colorTertiaryContainer">@color/ok_container</item>
+        <item name="colorOnTertiaryContainer">@color/ok_on_container</item>
+
+        <!-- Error -->
+        <item name="colorError">@color/error_on_container</item>
+        <item name="colorOnError">@color/error_container</item>
+        <item name="colorErrorContainer">@color/error_container</item>
+        <item name="colorOnErrorContainer">@color/error_on_container</item>
+
+        <!-- Surfaces -->
+        <item name="colorSurface">@color/window_bg</item>
+        <item name="colorOnSurface">@color/text_high</item>
+        <item name="colorSurfaceVariant">@color/surface_3</item>
+        <item name="colorOnSurfaceVariant">@color/text_mid</item>
+        <item name="colorSurfaceContainerLowest">@color/window_bg</item>
+        <item name="colorSurfaceContainerLow">@color/surface_1</item>
+        <item name="colorSurfaceContainer">@color/surface_2</item>
+        <item name="colorSurfaceContainerHigh">@color/surface_3</item>
+        <item name="colorSurfaceContainerHighest">@color/surface_4</item>
+
+        <!-- Outlines: 1dp hairlines on cards, and the base colour of every focus ring. -->
+        <item name="colorOutline">@color/outline</item>
+        <item name="colorOutlineVariant">@color/outline_variant</item>
+
+        <!-- Inverse: the snackbar/contrast pair. -->
+        <item name="colorOnSurfaceInverse">@color/window_bg</item>
+        <item name="colorSurfaceInverse">@color/text_high</item>
+
+        <!-- Window -->
         <item name="android:windowBackground">@color/window_bg</item>
         <item name="android:colorBackground">@color/window_bg</item>
         <item name="android:statusBarColor">@color/window_bg</item>
         <item name="android:navigationBarColor">@color/window_bg</item>
 
-        <!-- Framework (non-Material) widgets read these instead of colorOnSurface, so state
-             them explicitly rather than relying on the parent scheme being dark. -->
-        <item name="android:textColorPrimary">#FFFFFF</item>
-        <item name="android:textColorSecondary">#C6D4DF</item>
-        <item name="android:textColorTertiary">#8F98A0</item>
+        <!-- Framework (non-Material) widgets read these instead of colorOnSurface. -->
+        <item name="android:textColorPrimary">@color/text_high</item>
+        <item name="android:textColorSecondary">@color/text_mid</item>
+        <item name="android:textColorTertiary">@color/text_low</item>
     </style>
 </resources>

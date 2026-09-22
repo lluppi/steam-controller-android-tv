@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Television style overrides.
+
+  Layout attributes that are not dimensions - orientation, width, weight - cannot come from
+  dimens.xml, so they live in a style and get a second definition here. The base file
+  (values/styles.xml) stacks the controller and connection cards; a television screen is wide
+  and short, so there they sit side by side instead, which keeps the dashboard above the fold
+  at ≈960×540dp.
+-->
+<resources>
+
+    <style name="Main.Pair" parent="Main.Pair.Base">
+        <item name="android:orientation">horizontal</item>
+    </style>
+
+    <!-- Debug screen: the same collapse, so the markup is written once. -->
+    <style name="Debug.Columns" parent="Debug.Columns.Base">
+        <item name="android:orientation">horizontal</item>
+    </style>
+
+    <!-- Calibration: sticks beside the settings cards instead of above them. -->
+    <style name="Calib.Columns" parent="Calib.Columns.Base">
+        <item name="android:orientation">horizontal</item>
+    </style>
+
+    <!-- match_parent height on both columns: LinearLayout measures the taller column and then
+         re-measures the other to match, so the two columns end level even though the cards
+         inside them are different heights. -->
+    <style name="Calib.Col.Left" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:layout_marginEnd">@dimen/debug_col_gap</item>
+    </style>
+
+    <style name="Calib.Col.Right" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="Debug.Col.Left" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:layout_marginEnd">@dimen/debug_col_gap</item>
+    </style>
+
+    <style name="Debug.Col.Right" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="Main.HeroCard" parent="AppCard.Hero">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginEnd">@dimen/block_gap</item>
+        <item name="android:layout_marginBottom">0dp</item>
+    </style>
+
+    <style name="Main.ConnectionCard" parent="AppCard.Outlined">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+    </style>
+
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Action card surface. Lifts one step on focus so the ring is not the only signal. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:color="@color/surface_3" />
+    <item android:state_pressed="true" android:color="@color/surface_3" />
+    <item android:color="@color/surface_1" />
+</selector>

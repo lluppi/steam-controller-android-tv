@@ -1,24 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- App background. Single source of truth for the window background and the root layout
-         background, so regions vacated by scrolling are painted deterministically instead of
-         relying on whatever the compositor left behind. -->
-    <color name="window_bg">#1B2838</color>
+    <!-- ── Surfaces ─────────────────────────────────────────────────────────────
+         Near-black with a blue cast. One ramp, five steps: elevation is expressed by
+         surface colour, not shadows (a TV has no shadows worth speaking of). -->
+    <color name="window_bg">#0A0E13</color>
+    <color name="surface_1">#0E131A</color>
+    <color name="surface_2">#121821</color>
+    <color name="surface_3">#171F29</color>
+    <color name="surface_4">#1F2A36</color>
+    <color name="outline">#3A4E63</color>
+    <color name="outline_variant">#22303D</color>
 
-    <color name="chip_inactive">#8F98A0</color>
-    <color name="action_fill">#66C0F4</color>
-    <color name="action_fill_focused">#A6DEFF</color>
+    <!-- ── Accent ───────────────────────────────────────────────────────────────
+         Electric cyan - Steam's blue (#66C0F4) pushed brighter so it reads as a lit
+         element on near-black instead of a tint. -->
+    <color name="accent">#4FD6FF</color>
+    <color name="accent_on">#00202E</color>
+    <color name="accent_container">#0E3A4E</color>
+    <color name="accent_on_container">#B6ECFF</color>
+    <color name="accent_dim">#66C0F4</color>
 
-    <!-- Status pill — connected/active state (green). -->
-    <color name="status_connected_container">#1F3A2A</color>
-    <color name="status_connected_on_container">#7CD49B</color>
+    <!-- Text ramp. Three steps, no more: high = content, mid = labels, low = disabled. -->
+    <color name="text_high">#E8F4FF</color>
+    <color name="text_mid">#A9BECE</color>
+    <color name="text_low">#6C8093</color>
 
-    <!-- Status pill — neutral / idle state matches colorTertiaryContainer of the dark theme. -->
-    <color name="status_idle_container">#3A2A2D</color>
-    <color name="status_idle_on_container">#E5BAB4</color>
+    <!-- State colours: mint for live, amber for "not ready yet". -->
+    <color name="ok_container">#0F3323</color>
+    <color name="ok_on_container">#7BEBA8</color>
+    <color name="warn_container">#3A2E12</color>
+    <color name="warn_on_container">#F5D08A</color>
+    <color name="error_container">#3A1D22</color>
+    <color name="error_on_container">#FFA6A6</color>
+
+    <!-- ── Names the rest of the app already binds to ───────────────────────────
+         Kept deliberately: Kotlin reads these by name, and layouts use them for
+         chips and mapping badges. -->
+
+    <!-- Inactive chip / secondary label text. -->
+    <color name="chip_inactive">#A9BECE</color>
+
+    <!-- Big Start/Stop button. Unfocused is a dark accent wash so the focused state
+         has somewhere to go - the difference is the whole point of the selector. -->
+    <color name="action_fill">#0E3A4E</color>
+    <color name="action_fill_focused">#4FD6FF</color>
+
+    <color name="status_connected_container">#0F3323</color>
+    <color name="status_connected_on_container">#7BEBA8</color>
+    <color name="status_idle_container">#3A2E12</color>
+    <color name="status_idle_on_container">#F5D08A</color>
 
     <!-- Classic Xbox 360 face-button colour, used to tint the target chip in MappingActivity rows. -->
     <color name="btn_xbox_a">#5CC04C</color>
     <!-- Neutral grey for non-face targets (bumpers, sticks, system) and the SC source chip. -->
     <color name="btn_neutral">#E8E8E8</color>
+    <!-- Text drawn on those light badges, which stay light on purpose so the glyph reads. -->
+    <color name="on_badge">#0E1A22</color>
 </resources>

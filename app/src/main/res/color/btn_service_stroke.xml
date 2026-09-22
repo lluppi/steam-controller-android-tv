@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Focus ring, identical to every card below it: same colour, same 3dp width, so "cyan ring
+     means focused" is one rule across the whole screen. Unfocused is deliberately unchanged -
+     the button keeps its own hairline rather than matching the cards' outline_variant. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_focused="true" android:color="@android:color/white" />
-    <item android:color="@android:color/transparent" />
+    <item android:state_focused="true" android:color="@color/accent" />
+    <item android:state_pressed="true" android:color="@color/accent" />
+    <item android:color="@color/outline" />
 </selector>

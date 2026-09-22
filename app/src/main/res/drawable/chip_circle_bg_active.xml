@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Active state for a circular debug chip. Was a hardcoded #7CD49B (a green that matched
+     nothing else on the screen); now the same accent as the rectangular chips. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
-    <solid android:color="#7CD49B" />
+    <solid android:color="@color/accent" />
 </shape>

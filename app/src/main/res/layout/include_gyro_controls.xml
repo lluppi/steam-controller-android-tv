@@ -1,53 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Gyro controls, included by CalibrationActivity.
+
+  Same card, radii and type ramp as the cards around it - it used to be a 20dp-cornered card
+  with its own header styling and every value label set to 14sp, next to neighbours at 18dp
+  and 12sp. Its layout_width/height come from the <include> tag at the call site.
+-->
 <com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    app:cardCornerRadius="20dp"
+    android:layout_marginBottom="@dimen/block_gap"
+    app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+    app:cardCornerRadius="@dimen/card_radius"
     app:cardElevation="0dp"
     app:strokeColor="?attr/colorOutlineVariant"
     app:strokeWidth="1dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="18dp">
+    <LinearLayout style="@style/Calib.GroupBody">
 
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp"
-            android:letterSpacing="0.18"
-            android:text="@string/calib_gyro_header"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            style="@style/SectionLabel"
+            android:layout_marginBottom="@dimen/block_gap"
+            android:text="@string/calib_gyro_header" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/switchGyroEnabled"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/calib_gyro_enable"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="14sp" />
+            style="@style/Calib.Switch"
+            android:text="@string/calib_gyro_enable" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnGyroActivation"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/calib_gyro_activation"
-            android:textSize="12sp" />
+            style="@style/Calib.SecondaryButton"
+            android:layout_marginTop="@dimen/block_gap"
+            android:text="@string/calib_gyro_activation" />
 
         <com.google.android.material.slider.Slider
             android:id="@+id/sliderGyroSensitivity"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            style="@style/Calib.Slider"
+            android:layout_marginTop="@dimen/debug_chip_gap"
             android:contentDescription="@string/calib_gyro_sensitivity"
             android:stepSize="0.1"
             android:value="1.0"
@@ -56,18 +49,13 @@
 
         <TextView
             android:id="@+id/tvGyroSensitivity"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
+            style="@style/Calib.Value"
             android:text="1.0×"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="14sp"
             tools:ignore="HardcodedText" />
 
         <com.google.android.material.slider.Slider
             android:id="@+id/sliderGyroSensitivityY"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            style="@style/Calib.Slider"
             android:contentDescription="@string/calib_gyro_sensitivity_y"
             android:stepSize="0.1"
             android:value="1.0"
@@ -76,18 +64,13 @@
 
         <TextView
             android:id="@+id/tvGyroSensitivityY"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
+            style="@style/Calib.Value"
             android:text="1.0× vertical"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="14sp"
             tools:ignore="HardcodedText" />
 
         <com.google.android.material.slider.Slider
             android:id="@+id/sliderGyroSmoothing"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            style="@style/Calib.Slider"
             android:contentDescription="@string/calib_gyro_smoothing"
             android:stepSize="0.05"
             android:value="0.25"
@@ -96,18 +79,13 @@
 
         <TextView
             android:id="@+id/tvGyroSmoothing"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
+            style="@style/Calib.Value"
             android:text="25% smoothing"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="14sp"
             tools:ignore="HardcodedText" />
 
         <com.google.android.material.slider.Slider
             android:id="@+id/sliderGyroDeadzone"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            style="@style/Calib.Slider"
             android:contentDescription="@string/calib_gyro_deadzone"
             android:stepSize="0.005"
             android:value="0.02"
@@ -116,18 +94,13 @@
 
         <TextView
             android:id="@+id/tvGyroDeadzone"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
+            style="@style/Calib.Value"
             android:text="0.020 rad/s deadzone"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="14sp"
             tools:ignore="HardcodedText" />
 
         <com.google.android.material.slider.Slider
             android:id="@+id/sliderGyroResponse"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            style="@style/Calib.Slider"
             android:contentDescription="@string/calib_gyro_response"
             android:stepSize="0.1"
             android:value="1.0"
@@ -136,29 +109,20 @@
 
         <TextView
             android:id="@+id/tvGyroResponse"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
+            style="@style/Calib.Value"
             android:text="1.0 response"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="14sp"
             tools:ignore="HardcodedText" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnGyroCalibrate"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/calib_gyro_calibrate"
-            android:textSize="12sp" />
+            style="@style/Calib.SecondaryButton"
+            android:layout_marginTop="@dimen/block_gap"
+            android:text="@string/calib_gyro_calibrate" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/switchGyroInvertY"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/calib_gyro_invert_y"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="14sp" />
+            style="@style/Calib.Switch"
+            android:layout_marginTop="@dimen/debug_chip_gap"
+            android:text="@string/calib_gyro_invert_y" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

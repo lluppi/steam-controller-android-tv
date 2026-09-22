@@ -5,7 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import java.util.concurrent.atomic.AtomicLong
 
-// Bound by Shizuku.bindUserService() — this code runs in a separate process with the
+// Bound by Shizuku.bindUserService() - this code runs in a separate process with the
 // shell UID (2000), which is what gives access to the virtual-output device nodes.
 //
 // IMPORTANT: must have a no-arg constructor. Shizuku v13+ also tries the Context
@@ -38,7 +38,7 @@ class UInputService : IUInputService.Stub {
     //
     // This process runs as the shell uid and holds the uhid devices. If the app is killed
     // abruptly (an adb install does exactly this) nothing calls destroy(), so the process would
-    // survive as an orphan with its devices still registered — which is how duplicate gamepads
+    // survive as an orphan with its devices still registered - which is how duplicate gamepads
     // accumulate and how RetroArch ends up bound to a pad whose owner no longer exists.
     //
     // The app polls us continuously while it is alive (the rumble poll runs at 50 Hz), so silence
@@ -63,7 +63,7 @@ class UInputService : IUInputService.Stub {
                             if (idle > CLIENT_IDLE_TIMEOUT_MS) {
                                 Log.i(
                                     TAG,
-                                    "no client calls for ${idle}ms — exiting so the devices are " +
+                                    "no client calls for ${idle}ms - exiting so the devices are " +
                                         "released instead of being orphaned"
                                 )
                                 try {
@@ -176,7 +176,7 @@ class UInputService : IUInputService.Stub {
     }
 
     override fun pollForceFeedback(): IntArray? {
-        // Called at 50 Hz by the app while it is alive — the main proof of life.
+        // Called at 50 Hz by the app while it is alive - the main proof of life.
         touch()
         return try {
             UInputNative.pollFFEvent()

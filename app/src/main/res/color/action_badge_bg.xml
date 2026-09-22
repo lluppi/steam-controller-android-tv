@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Action card icon badge. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:color="@color/accent_container" />
+    <item android:state_pressed="true" android:color="@color/accent_container" />
+    <item android:color="@color/surface_3" />
+</selector>

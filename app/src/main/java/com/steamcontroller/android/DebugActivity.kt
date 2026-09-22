@@ -78,7 +78,7 @@ class DebugActivity : AppCompatActivity() {
     private fun updateButtons(s: SteamControllerState) {
         /**
          * Toggles a chip's background + text colour to reflect button state.
-         * V1.2 chips come in two shapes — rectangular pill (system/grips/back) and
+         * V1.2 chips come in two shapes - rectangular pill (system/grips/back) and
          * circular (face buttons, DPAD, stick clicks). We pick the right drawable
          * pair based on `circular`.
          */
@@ -118,15 +118,15 @@ class DebugActivity : AppCompatActivity() {
     }
 
     private fun updateAxes(s: SteamControllerState) {
-        // Triggers — already 0-32767, scale to 0-255 for ProgressBar.
+        // Triggers - already 0-32767, scale to 0-255 for ProgressBar.
         binding.pbLT.progress = s.leftTrigger / 128
         binding.tvLT.text = s.leftTrigger.toString()
         binding.pbRT.progress = s.rightTrigger / 128
         binding.tvRT.text = s.rightTrigger.toString()
 
-        // Sticks — raw is ±32767 (Int16). Centre the bar by offsetting +32768 against max=65535.
+        // Sticks - raw is ±32767 (Int16). Centre the bar by offsetting +32768 against max=65535.
         // ProgressBars are phone-layout-only; sw600dp / TV variants don't have them yet, so
-        // the binding fields are nullable — use safe calls.
+        // the binding fields are nullable - use safe calls.
         fun setSignedBar(progressView: android.widget.ProgressBar?, raw: Int) {
             progressView?.progress = (raw + 32768).coerceIn(0, 65535)
         }
@@ -139,7 +139,7 @@ class DebugActivity : AppCompatActivity() {
         binding.tvRSX.text = "X: %6d".format(s.rightJoyX.toInt())
         binding.tvRSY.text = "Y: %6d".format(s.rightJoyY.toInt())
 
-        // Trackpads — same signed range, same bar trick.
+        // Trackpads - same signed range, same bar trick.
         setSignedBar(binding.pbLPX, s.leftPadX.toInt())
         setSignedBar(binding.pbLPY, s.leftPadY.toInt())
         setSignedBar(binding.pbRPX, s.rightPadX.toInt())

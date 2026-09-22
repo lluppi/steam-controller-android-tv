@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  CalibrationActivity (phone) — V1.2 redesign.
-  Mockup validated by user. Structure:
-    1. STICKS card: deadzone sliders (one per stick), compact stick visualizations
-       side-by-side with Raw X/Y readouts, single "Calibrate All" button.
-    2. RUMBLE card: intensity slider + Pulse test button.
-    3. DESKTOP card: mouse sensitivity slider + Trackpads-as-mouse switch.
+  CalibrationActivity - one layout for every form factor.
+
+  Was three near-copies at 405 / 405 / 399 lines that between them used exactly one custom
+  style. Every colour, text size, padding and corner radius was written out by hand per
+  variant, which is why this screen drifted furthest from the rest of the app.
+
+  Now: four cards on the shared tokens, one column on a handheld and a 2x2 grid on a wide
+  screen (Calib.Columns, overridden in values-television/styles.xml). The columns are equal
+  height; the cards inside them are not - sticks + rumble down one side, gyro + desktop down
+  the other, which is roughly what they weigh.
 -->
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -13,24 +17,24 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
-    android:background="?attr/colorSurface">
+    android:background="@color/window_bg"
+    android:fitsSystemWindows="true">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorSurface">
+        android:background="@color/window_bg">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorSurface"
-            app:title="@string/calib_title"
-            app:titleTextColor="?attr/colorPrimary"
+            android:layout_height="@dimen/toolbar_height"
+            android:background="@color/window_bg"
+            app:menu="@menu/menu_calibration"
             app:navigationIcon="@android:drawable/ic_menu_close_clear_cancel"
             app:navigationIconTint="?attr/colorPrimary"
-            app:menu="@menu/menu_calibration" />
+            app:title="@string/calib_title"
+            app:titleTextColor="?attr/colorPrimary" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <ScrollView
@@ -41,364 +45,255 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:maxWidth="@dimen/content_max_width"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:paddingHorizontal="@dimen/content_pad_h"
+            android:paddingTop="@dimen/content_pad_top"
+            android:paddingBottom="@dimen/content_pad_bottom">
 
-            <!-- ━━━━━━━━━━━━ STICKS ━━━━━━━━━━━━ -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="20dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+            <LinearLayout style="@style/Calib.Columns">
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="18dp">
+                <!-- ── Sticks + rumble ───────────────────────────────────────────── -->
+                <LinearLayout style="@style/Calib.Col.Left">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/calib_sticks_header"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="12sp"
-                        android:textStyle="bold"
-                        android:letterSpacing="0.18"
-                        android:layout_marginBottom="14dp" />
+                    <com.google.android.material.card.MaterialCardView style="@style/Calib.Card">
 
-                    <!-- Deadzone row (label + two sliders + two %) -->
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/calib_deadzone_label"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="14sp" />
+                        <LinearLayout style="@style/Calib.GroupBody">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:baselineAligned="false">
+                            <TextView
+                                style="@style/SectionLabel"
+                                android:layout_marginBottom="@dimen/block_gap"
+                                android:text="@string/calib_sticks_header" />
 
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginEnd="8dp"
-                            android:orientation="vertical">
+                            <TextView style="@style/Calib.Field" android:text="@string/calib_deadzone_label" />
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:baselineAligned="false"
+                                android:orientation="horizontal">
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:orientation="vertical">
+
+                                    <com.google.android.material.slider.Slider
+                                        android:id="@+id/sliderLeftDeadzone"
+                                        style="@style/Calib.Slider"
+                                        android:contentDescription="@string/calib_slider_left_deadzone_desc"
+                                        android:stepSize="1"
+                                        android:value="8"
+                                        android:valueFrom="0"
+                                        android:valueTo="40" />
+
+                                    <TextView
+                                        android:id="@+id/tvLeftDeadzone"
+                                        style="@style/Calib.Value"
+                                        android:layout_gravity="center_horizontal"
+                                        android:text="8%"
+                                        tools:ignore="HardcodedText" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="@dimen/debug_axis_gap"
+                                    android:layout_weight="1"
+                                    android:orientation="vertical">
+
+                                    <com.google.android.material.slider.Slider
+                                        android:id="@+id/sliderRightDeadzone"
+                                        style="@style/Calib.Slider"
+                                        android:contentDescription="@string/calib_slider_right_deadzone_desc"
+                                        android:stepSize="1"
+                                        android:value="8"
+                                        android:valueFrom="0"
+                                        android:valueTo="40" />
+
+                                    <TextView
+                                        android:id="@+id/tvRightDeadzone"
+                                        style="@style/Calib.Value"
+                                        android:layout_gravity="center_horizontal"
+                                        android:text="8%"
+                                        tools:ignore="HardcodedText" />
+                                </LinearLayout>
+                            </LinearLayout>
+
+                            <!-- Visualisation and its readout, one per stick. -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/block_gap"
+                                android:baselineAligned="false"
+                                android:orientation="horizontal">
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center_horizontal"
+                                    android:orientation="vertical">
+
+                                    <com.steamcontroller.android.StickPadView
+                                        android:id="@+id/padLeft"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="@dimen/calib_pad_height" />
+
+                                    <TextView
+                                        android:id="@+id/tvLeftRaw"
+                                        style="@style/Calib.Value"
+                                        android:layout_marginTop="@dimen/debug_chip_gap"
+                                        android:text="Raw X: 0\nRaw Y: 0"
+                                        tools:ignore="HardcodedText" />
+
+                                    <com.google.android.material.materialswitch.MaterialSwitch
+                                        android:id="@+id/switchLeftInvertY"
+                                        style="@style/Calib.Switch"
+                                        android:layout_marginTop="@dimen/debug_chip_gap"
+                                        android:text="@string/calib_invert_y" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="@dimen/debug_axis_gap"
+                                    android:layout_weight="1"
+                                    android:gravity="center_horizontal"
+                                    android:orientation="vertical">
+
+                                    <com.steamcontroller.android.StickPadView
+                                        android:id="@+id/padRight"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="@dimen/calib_pad_height" />
+
+                                    <TextView
+                                        android:id="@+id/tvRightRaw"
+                                        style="@style/Calib.Value"
+                                        android:layout_marginTop="@dimen/debug_chip_gap"
+                                        android:text="Raw X: 0\nRaw Y: 0"
+                                        tools:ignore="HardcodedText" />
+
+                                    <com.google.android.material.materialswitch.MaterialSwitch
+                                        android:id="@+id/switchRightInvertY"
+                                        style="@style/Calib.Switch"
+                                        android:layout_marginTop="@dimen/debug_chip_gap"
+                                        android:text="@string/calib_invert_y" />
+                                </LinearLayout>
+                            </LinearLayout>
+
+                            <!-- The screen's primary action, so it wears the same primary-button
+                                 style as Start/Stop: same height, same focus ring, same flip of
+                                 fill and text colour when focused. -->
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnCalibrateAll"
+                                style="@style/Calib.SecondaryButton"
+                                android:layout_marginTop="@dimen/block_gap"
+                                android:text="@string/calib_calibrate_all" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Rumble sits under the sticks so the two columns balance: sticks + rumble
+                         against gyro + desktop. -->
+                    <com.google.android.material.card.MaterialCardView style="@style/Calib.Card">
+
+                        <LinearLayout style="@style/Calib.GroupBody">
+
+                            <TextView
+                                style="@style/SectionLabel"
+                                android:layout_marginBottom="@dimen/block_gap"
+                                android:text="@string/calib_rumble_header" />
+
+                            <TextView style="@style/Calib.Field" android:text="@string/calib_test_intensity" />
 
                             <com.google.android.material.slider.Slider
-                                android:id="@+id/sliderLeftDeadzone"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:contentDescription="@string/calib_slider_left_deadzone_desc"
+                                android:id="@+id/sliderRumbleIntensity"
+                                style="@style/Calib.Slider"
+                                android:contentDescription="@string/calib_slider_rumble_intensity_desc"
+                                android:stepSize="5"
+                                android:value="100"
                                 android:valueFrom="0"
-                                android:valueTo="40"
-                                android:stepSize="1"
-                                android:value="8" />
+                                android:valueTo="100" />
 
                             <TextView
-                                android:id="@+id/tvLeftDeadzone"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_gravity="center_horizontal"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="12sp"
-                                android:fontFamily="monospace"
-                                android:text="8%"
+                                android:id="@+id/tvRumbleIntensity"
+                                style="@style/Calib.Value"
+                                android:layout_marginBottom="@dimen/block_gap"
+                                android:text="100%"
                                 tools:ignore="HardcodedText" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnTestRumble"
+                                style="@style/Calib.SecondaryButton"
+                                android:text="@string/calib_test_rumble" />
                         </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
 
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="8dp"
-                            android:orientation="vertical">
+                <!-- ── Gyro + desktop ───────────────────────────────────────────── -->
+                <LinearLayout style="@style/Calib.Col.Right">
 
-                            <com.google.android.material.slider.Slider
-                                android:id="@+id/sliderRightDeadzone"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:contentDescription="@string/calib_slider_right_deadzone_desc"
-                                android:valueFrom="0"
-                                android:valueTo="40"
-                                android:stepSize="1"
-                                android:value="8" />
-
-                            <TextView
-                                android:id="@+id/tvRightDeadzone"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_gravity="center_horizontal"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="12sp"
-                                android:fontFamily="monospace"
-                                android:text="8%"
-                                tools:ignore="HardcodedText" />
-                        </LinearLayout>
-                    </LinearLayout>
-
-                    <!-- Sticks visualization row -->
-                    <LinearLayout
+                    <!-- The margin has to be on the include tag: once an <include> specifies
+                         layout_width/height, its layout params come from the tag, so the root
+                         card's own marginBottom would be dropped. -->
+                    <include
+                        android:id="@+id/gyroControls"
+                        layout="@layout/include_gyro_controls"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
-                        android:orientation="horizontal"
-                        android:baselineAligned="false">
+                        android:layout_marginBottom="@dimen/block_gap" />
 
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:gravity="center_horizontal">
+                    <com.google.android.material.card.MaterialCardView style="@style/Calib.Card">
 
-                            <com.steamcontroller.android.StickPadView
-                                android:id="@+id/padLeft"
-                                android:layout_width="match_parent"
-                                android:layout_height="120dp" />
+                        <LinearLayout style="@style/Calib.GroupBody">
 
                             <TextView
-                                android:id="@+id/tvLeftRaw"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="11sp"
-                                android:fontFamily="monospace"
-                                android:text="Raw X: 0\nRaw Y: 0"
+                                style="@style/SectionLabel"
+                                android:layout_marginBottom="@dimen/block_gap"
+                                android:text="@string/calib_desktop_header" />
+
+                            <TextView style="@style/Calib.Field" android:text="@string/calib_mouse_sensitivity" />
+
+                            <com.google.android.material.slider.Slider
+                                android:id="@+id/sliderMouseSensitivity"
+                                style="@style/Calib.Slider"
+                                android:contentDescription="@string/calib_mouse_sensitivity"
+                                android:stepSize="0.1"
+                                android:value="1.0"
+                                android:valueFrom="0.1"
+                                android:valueTo="3.0" />
+
+                            <TextView
+                                android:id="@+id/tvMouseSensitivity"
+                                style="@style/Calib.Value"
+                                android:layout_marginBottom="@dimen/block_gap"
+                                android:text="1.0×"
                                 tools:ignore="HardcodedText" />
 
                             <com.google.android.material.materialswitch.MaterialSwitch
-                                android:id="@+id/switchLeftInvertY"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="6dp"
-                                android:text="@string/calib_invert_y"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="12sp" />
-                        </LinearLayout>
+                                android:id="@+id/switchTrackpadAsMouse"
+                                style="@style/Calib.Switch"
+                                android:text="@string/calib_trackpad_switch_label" />
 
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="10dp"
-                            android:orientation="vertical"
-                            android:gravity="center_horizontal">
-
-                            <com.steamcontroller.android.StickPadView
-                                android:id="@+id/padRight"
-                                android:layout_width="match_parent"
-                                android:layout_height="120dp" />
-
-                            <TextView
-                                android:id="@+id/tvRightRaw"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="11sp"
-                                android:fontFamily="monospace"
-                                android:text="Raw X: 0\nRaw Y: 0"
-                                tools:ignore="HardcodedText" />
+                            <TextView style="@style/Calib.Hint" android:text="@string/calib_trackpad_hint" />
 
                             <com.google.android.material.materialswitch.MaterialSwitch
-                                android:id="@+id/switchRightInvertY"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="6dp"
-                                android:text="@string/calib_invert_y"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="12sp" />
+                                android:id="@+id/switchStartOnBoot"
+                                style="@style/Calib.Switch"
+                                android:layout_marginTop="@dimen/block_gap"
+                                android:text="@string/calib_start_on_boot" />
+
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/switchStartOnConnect"
+                                style="@style/Calib.Switch"
+                                android:layout_marginTop="@dimen/debug_chip_gap"
+                                android:text="@string/calib_start_on_connect" />
                         </LinearLayout>
-                    </LinearLayout>
-
-                    <!-- Single Calibrate All button — captures center for both sticks at once -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnCalibrateAll"
-                        android:layout_width="match_parent"
-                        android:layout_height="52dp"
-                        android:layout_marginTop="16dp"
-                        android:text="@string/calib_calibrate_all"
-                        android:textStyle="bold"
-                        app:cornerRadius="16dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_horizontal"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/calib_calibrate_hint"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp"
-                        android:fontFamily="sans-serif-light" />
-
+                    </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- ━━━━━━━━━━━━ RUMBLE ━━━━━━━━━━━━ -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="20dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="18dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/calib_rumble_header"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="12sp"
-                        android:textStyle="bold"
-                        android:letterSpacing="0.18"
-                        android:layout_marginBottom="6dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/calib_test_intensity"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="14sp" />
-
-                    <com.google.android.material.slider.Slider
-                        android:id="@+id/sliderRumbleIntensity"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:contentDescription="@string/calib_slider_rumble_intensity_desc"
-                        android:valueFrom="0"
-                        android:valueTo="100"
-                        android:stepSize="5"
-                        android:value="100" />
-
-                    <TextView
-                        android:id="@+id/tvRumbleIntensity"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="12sp"
-                        android:fontFamily="monospace"
-                        android:text="100%"
-                        android:layout_marginBottom="12dp"
-                        tools:ignore="HardcodedText" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnTestRumble"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:text="@string/calib_test_rumble"
-                        app:cornerRadius="16dp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <include
-                android:id="@+id/gyroControls"
-                layout="@layout/include_gyro_controls"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp" />
-
-            <!-- ━━━━━━━━━━━━ DESKTOP MODE ━━━━━━━━━━━━ -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardCornerRadius="20dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="18dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/calib_desktop_header"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="12sp"
-                        android:textStyle="bold"
-                        android:letterSpacing="0.18"
-                        android:layout_marginBottom="6dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/calib_mouse_sensitivity"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="14sp" />
-
-                    <com.google.android.material.slider.Slider
-                        android:id="@+id/sliderMouseSensitivity"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:contentDescription="@string/calib_mouse_sensitivity"
-                        android:valueFrom="0.1"
-                        android:valueTo="3.0"
-                        android:stepSize="0.1"
-                        android:value="1.0" />
-
-                    <TextView
-                        android:id="@+id/tvMouseSensitivity"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="12sp"
-                        android:fontFamily="monospace"
-                        android:text="1.0×"
-                        android:layout_marginBottom="16dp"
-                        tools:ignore="HardcodedText" />
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchTrackpadAsMouse"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/calib_trackpad_switch_label"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="14sp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/calib_trackpad_hint"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp"
-                        android:fontFamily="sans-serif-light"
-                        android:layout_marginTop="4dp" />
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchStartOnBoot"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:text="@string/calib_start_on_boot" />
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchStartOnConnect"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/calib_start_on_connect" />
-
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 

@@ -36,7 +36,7 @@ enum class MouseTarget(
 
     // bit 15 → Linux KEY_SELECT → AKEYCODE_DPAD_CENTER. Required to "click" a
     // focused key on the Android TV Leanback soft keyboard (ENTER alone is not
-    // enough — the IME source-filters selection to DPAD_CENTER events).
+    // enough - the IME source-filters selection to DPAD_CENTER events).
     KEY_DPAD_CENTER(15, "DPAD Center / select"),
 
     // Mouse buttons (bits 16-18 in the native frame)

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Television overrides - 1920×1080 xhdpi, i.e. ≈960×540dp, viewed from three metres with a
+  D-pad. Only the differences live here: wider overscan-safe gutters, a tighter vertical
+  rhythm so the dashboard still fits above the fold, and larger glyphs.
+
+  Anything not listed is inherited from values/dimens.xml.
+-->
+<resources>
+
+    <!-- Overscan: TVs crop the outer edge, so the gutters are deliberately generous. -->
+    <dimen name="content_pad_h">48dp</dimen>
+    <dimen name="content_pad_top">12dp</dimen>
+    <dimen name="content_pad_bottom">12dp</dimen>
+    <!-- Wider than any TV, so the content simply fills the screen - but still capped on a
+         hypothetical large display instead of stretching a 560dp column absurdly. -->
+    <dimen name="content_max_width">1400dp</dimen>
+
+    <!-- The title needs no breathing room at the top on TV; the padding already does it. -->
+    <dimen name="title_row_gap">0dp</dimen>
+
+    <!-- Tighter vertical rhythm: the whole dashboard has ~540dp to work with, and it is
+         taller than the old two-variant version, which only laid out what fitted. -->
+    <dimen name="block_gap">12dp</dimen>
+    <dimen name="row_gap">10dp</dimen>
+    <dimen name="label_gap">6dp</dimen>
+
+    <!-- A taller illustration is wasted height here; wider is what the 16:9 screen wants. -->
+    <dimen name="hero_illus_height">90dp</dimen>
+    <dimen name="hero_pad">14dp</dimen>
+
+    <!-- Badge and label sit in one 56dp row, so the pad is 8dp. action_glyph_pad is inherited
+         (5dp) on purpose: 32 - 2x5 = 22dp of glyph, exactly what the old 40dp badge with a 9dp
+         pad produced, so the disc shrinks and the glyph does not. -->
+    <dimen name="action_pad">8dp</dimen>
+    <dimen name="action_badge_size">32dp</dimen>
+    <dimen name="action_badge_radius">16dp</dimen>
+    <dimen name="action_label_size">15sp</dimen>
+    <!-- Pins the four icons into one column. 48dp leaves 183dp used of a ~210dp card for the
+         widest label (Button mapping), so nothing collides and the average group reads centred. -->
+    <dimen name="action_icon_inset">48dp</dimen>
+    <dimen name="pill_pad_v">10dp</dimen>
+
+    <!-- ── Debug screen ─────────────────────────────────────────────────────────
+         A TV toolbar runs taller and the two columns sit side by side with a wider gutter. -->
+    <dimen name="toolbar_height">64dp</dimen>
+    <dimen name="debug_col_gap">16dp</dimen>
+    <dimen name="debug_group_gap">12dp</dimen>
+
+    <!-- Bigger stick visualisation: the screen is viewed from further away than a handheld. -->
+    <dimen name="calib_pad_height">150dp</dimen>
+
+</resources>

@@ -12,7 +12,7 @@ plugins {
 // length, multiline-if-else, statement-wrapping, no-semi, trailing-comma-on-call-site,
 // function-literal) in files this fork never touched, so `ktlintFormat` rewrote ~16 unrelated
 // files and had to be reverted, and a `ktlintCheck` in CI would fail on day one. Adopting ktlint is
-// a whole-codebase decision — one dedicated formatting commit, reviewed with `git diff -w` — not a
+// a whole-codebase decision - one dedicated formatting commit, reviewed with `git diff -w` - not a
 // cleanup step. `.editorconfig` declares the intended style (`android_studio`) for editors that
 // honour it.
 
@@ -83,7 +83,7 @@ android {
         debug {
             // Install side by side with any existing build instead of replacing it. A debug
             // build is signed with a different key, so an in-place upgrade is impossible and
-            // adb would have to uninstall first — which would take the user's calibrations,
+            // adb would have to uninstall first - which would take the user's calibrations,
             // mappings and named profiles with it. Release builds keep the real application
             // id, so this only affects debug installs.
             applicationIdSuffix = ".debug"

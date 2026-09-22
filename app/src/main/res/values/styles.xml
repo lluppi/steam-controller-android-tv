@@ -1,15 +1,261 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="SectionHeader">
+    <!-- ════════════════════════════════════════════════════════════════════════
+         Layout-only dimensions live in dimens.xml / values-television/dimens.xml.
+         The styles below carry shape, colour and typography only, so a screen can be
+         re-laid-out for TV without touching its markup.
+         ════════════════════════════════════════════════════════════════════════ -->
+
+    <!-- ── Section label ────────────────────────────────────────────────────────
+         One style for every small caps section heading ("CONNECTION", "CONTROL MODE").
+         These used to be hand-written per instance with different colour, weight and
+         letter spacing, which is why they did not match. -->
+    <style name="SectionLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="android:textSize">@dimen/label_size</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.16</item>
+    </style>
+
+    <!-- ── Cards ──────────────────────────────────────────────────────────────── -->
+    <style name="AppCard" parent="">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:textColor">@color/chip_inactive</item>
-        <item name="android:textSize">10sp</item>
-        <item name="android:letterSpacing">0.1</item>
-        <item name="android:layout_marginTop">12dp</item>
-        <item name="android:layout_marginBottom">4dp</item>
+        <item name="cardCornerRadius">@dimen/card_radius</item>
+        <item name="cardElevation">0dp</item>
+        <item name="cardBackgroundColor">?attr/colorSurfaceContainerLow</item>
     </style>
+
+    <style name="AppCard.Outlined">
+        <item name="cardBackgroundColor">@color/action_card_bg</item>
+        <item name="strokeColor">@color/focusable_card_stroke</item>
+        <item name="strokeWidth">@dimen/focus_stroke</item>
+    </style>
+
+    <!-- The hero card holding the controller illustration. -->
+    <style name="AppCard.Hero">
+        <item name="cardBackgroundColor">?attr/colorPrimaryContainer</item>
+    </style>
+
+    <style name="AppCard.Body">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:padding">@dimen/card_pad</item>
+    </style>
+
+    <!-- ── Icon buttons ─────────────────────────────────────────────────────────
+         A MaterialButton with only an icon centres its glyph with its own padding and
+         insets, which is why the GitHub/Help glyphs sat off-centre in their circles.
+         A card is a circle we control exactly, and it gives us a real focus ring. -->
+    <style name="CircleIconButton" parent="">
+        <item name="android:layout_width">@dimen/icon_button_size</item>
+        <item name="android:layout_height">@dimen/icon_button_size</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="cardCornerRadius">@dimen/icon_button_radius</item>
+        <item name="cardElevation">0dp</item>
+        <item name="cardBackgroundColor">@color/icon_button_bg</item>
+        <item name="strokeColor">@color/icon_button_stroke</item>
+        <item name="strokeWidth">@dimen/focus_stroke</item>
+    </style>
+
+    <style name="CircleIconButton.Glyph" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_gravity">center</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:padding">@dimen/icon_button_glyph_pad</item>
+        <item name="android:clickable">false</item>
+        <item name="android:focusable">false</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:tint">@color/icon_button_tint</item>
+    </style>
+
+    <!-- ── Buttons ────────────────────────────────────────────────────────────── -->
+    <!-- The big Start/Stop button. Fill, stroke AND text colour all move together so the
+         focused state is unmissable from three metres away, which is the distance that
+         matters here. -->
+    <style name="BigActionButton" parent="Widget.Material3.Button">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/big_button_height</item>
+        <item name="android:textSize">@dimen/big_button_text_size</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/btn_service_text</item>
+        <item name="android:letterSpacing">0.02</item>
+        <item name="backgroundTint">@color/btn_service_bg</item>
+        <item name="cornerRadius">@dimen/big_button_radius</item>
+        <item name="strokeColor">@color/btn_service_stroke</item>
+        <item name="strokeWidth">@dimen/focus_stroke</item>
+    </style>
+
+    <!-- ── Segmented toggle rows (transport, control mode) ────────────────────── -->
+    <style name="Segment" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">@dimen/segment_height</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textSize">@dimen/segment_text_size</item>
+        <item name="android:textColor">@color/segment_text</item>
+        <item name="android:letterSpacing">0.02</item>
+        <item name="iconSize">@dimen/segment_icon_size</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconTint">@color/segment_text</item>
+        <item name="strokeColor">@color/segment_stroke</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cornerRadius">@dimen/segment_radius</item>
+    </style>
+
+    <!-- ── Action cards (Calibration / Mapping / Profiles / Debug) ────────────── -->
+    <style name="ActionCard" parent="AppCard.Outlined">
+        <item name="android:layout_width">0dp</item>
+        <!-- A fixed height, the same 56dp as the Bluetooth field and the Start/Stop button, so
+             the whole screen sits on one control-height rhythm. It also makes the four cards
+             equal by construction instead of by identical content. -->
+        <item name="android:layout_height">@dimen/action_height</item>
+        <item name="android:layout_weight">1</item>
+    </style>
+
+    <!-- Icon + label centred as one group. The old version pinned the group left with
+         gravity="center_vertical", which is what made the bottom row look unbalanced. -->
+    <!-- parent="" is deliberate: without it, dot-notation would make this inherit from
+         ActionCard, and a stray layout_weight=1 on a row would fight the card's own layout. -->
+    <style name="ActionCard.Row" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <!-- Fills the card's fixed height so gravity=center has slack to centre within. -->
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:orientation">horizontal</item>
+        <!-- center_vertical, NOT center: the group is anchored to a fixed left inset so every
+             card's icon lands in the same column, regardless of how long its label is. -->
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">@dimen/action_icon_inset</item>
+        <item name="android:paddingEnd">@dimen/action_pad</item>
+        <item name="android:paddingTop">@dimen/action_pad</item>
+        <item name="android:paddingBottom">@dimen/action_pad</item>
+    </style>
+
+    <style name="ActionCard.Badge" parent="">
+        <item name="android:layout_width">@dimen/action_badge_size</item>
+        <item name="android:layout_height">@dimen/action_badge_size</item>
+        <item name="cardCornerRadius">@dimen/action_badge_radius</item>
+        <item name="cardElevation">0dp</item>
+        <item name="cardBackgroundColor">@color/action_badge_bg</item>
+    </style>
+
+    <!-- parent="" + clickable/focusable=false are both load-bearing: inheriting from
+         ActionCard made the glyph itself clickable, so it swallowed touches that belong to
+         the card and could steal D-pad focus. -->
+    <style name="ActionCard.Glyph" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:padding">@dimen/action_glyph_pad</item>
+        <item name="android:clickable">false</item>
+        <item name="android:focusable">false</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:tint">@color/action_glyph_tint</item>
+    </style>
+
+    <style name="ActionCard.Label" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <!-- Reset both explicitly: dot-notation inheritance from ActionCard would otherwise
+             carry layout_weight=1, which makes the label swallow all slack and pins the
+             icon+label group to the left instead of centring it. -->
+        <item name="android:layout_weight">0</item>
+        <item name="android:gravity">center</item>
+        <item name="android:layout_marginStart">@dimen/action_gap</item>
+        <item name="android:textColor">@color/action_label</item>
+        <item name="android:textSize">@dimen/action_label_size</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:duplicateParentState">true</item>
+    </style>
+
+    <!-- ── Status pill ────────────────────────────────────────────────────────── -->
+    <style name="StatusPill" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="cardCornerRadius">@dimen/pill_radius</item>
+        <item name="cardElevation">0dp</item>
+        <item name="cardBackgroundColor">@color/status_idle_container</item>
+        <item name="strokeColor">@color/focusable_card_stroke</item>
+        <item name="strokeWidth">@dimen/focus_stroke</item>
+    </style>
+
+    <style name="StatusPill.Text">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingHorizontal">@dimen/pill_pad_h</item>
+        <item name="android:paddingVertical">@dimen/pill_pad_v</item>
+        <item name="android:textSize">@dimen/pill_text_size</item>
+        <item name="android:textColor">@color/status_idle_on_container</item>
+        <item name="android:duplicateParentState">true</item>
+    </style>
+
+    <!-- ── Bluetooth device picker ──────────────────────────────────────────────
+         An exposed dropdown has to stay a TextInputLayout, so instead of being a stray
+         filled box it is dressed in the same tokens as everything else: the surface ramp,
+         a hairline outline, and the shared corner radius. Height comes from a dimension so
+         the refresh button beside it can match exactly. -->
+    <style name="BtField" parent="Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">@dimen/bt_field_height</item>
+        <item name="android:layout_weight">1</item>
+        <item name="boxBackgroundColor">?attr/colorSurfaceContainerLow</item>
+        <item name="boxStrokeColor">@color/segment_stroke</item>
+        <item name="boxStrokeWidth">1dp</item>
+        <item name="boxStrokeWidthFocused">2dp</item>
+        <item name="boxCornerRadiusTopStart">@dimen/segment_radius</item>
+        <item name="boxCornerRadiusTopEnd">@dimen/segment_radius</item>
+        <item name="boxCornerRadiusBottomStart">@dimen/segment_radius</item>
+        <item name="boxCornerRadiusBottomEnd">@dimen/segment_radius</item>
+        <item name="hintTextColor">?attr/colorPrimary</item>
+        <item name="android:textColorHint">@color/text_low</item>
+        <item name="endIconTint">@color/icon_button_tint</item>
+    </style>
+
+    <style name="BtRefresh" parent="CircleIconButton">
+        <item name="android:layout_width">@dimen/bt_field_height</item>
+        <item name="android:layout_height">@dimen/bt_field_height</item>
+        <item name="cardCornerRadius">@dimen/bt_refresh_radius</item>
+    </style>
+
+    <!-- ── The controller + connection pair ─────────────────────────────────────
+         Stacked on a phone, side by side on TV. Layout attributes that are not
+         dimensions (orientation, weight, width) cannot come from dimens.xml, so they
+         come from here and values-television/styles.xml overrides the pair. -->
+    <style name="Main.Pair.Base">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:baselineAligned">false</item>
+        <item name="android:layout_marginTop">@dimen/block_gap</item>
+    </style>
+
+    <style name="Main.Pair" parent="Main.Pair.Base">
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <!-- Layout attributes that are not dimensions cannot be merged by a dimension, so each
+         card carries its own combined style: shape from the card family, sizing from here. -->
+    <style name="Main.HeroCard" parent="AppCard.Hero">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginBottom">@dimen/block_gap</item>
+    </style>
+
+    <style name="Main.ConnectionCard" parent="AppCard.Outlined">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+    </style>
+
+    <!-- ════════════════════════════════════════════════════════════════════════
+         Below here: styles used by Calibration / Debug / Mapping / the help dialog.
+         ════════════════════════════════════════════════════════════════════════ -->
 
     <style name="BtnChip">
         <item name="android:layout_width">wrap_content</item>
@@ -19,8 +265,20 @@
         <item name="android:paddingTop">5dp</item>
         <item name="android:paddingBottom">5dp</item>
         <item name="android:background">@drawable/chip_bg</item>
-        <item name="android:textColor">@color/chip_inactive</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
         <item name="android:textSize">12sp</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- Circular chip for face buttons / DPAD / stick clicks. -->
+    <style name="BtnChipCircle">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/chip_circle_bg</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textSize">14sp</item>
         <item name="android:fontFamily">monospace</item>
         <item name="android:textStyle">bold</item>
     </style>
@@ -28,7 +286,7 @@
     <style name="AxisLabel">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:textColor">@color/chip_inactive</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
         <item name="android:textSize">11sp</item>
         <item name="android:layout_marginBottom">2dp</item>
     </style>
@@ -40,6 +298,125 @@
         <item name="android:textSize">11sp</item>
         <item name="android:fontFamily">monospace</item>
         <item name="android:layout_marginTop">2dp</item>
+    </style>
+
+    <style name="AxisValFull">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:fontFamily">monospace</item>
+    </style>
+
+    <!-- Bar graph row. Two ranges, so two styles rather than an inline android:max override at
+         every call site: triggers are 0..32767/128 = 0..255, signed axes are raw+32768 = 0..65535. -->
+    <style name="AxisBar" parent="Widget.AppCompat.ProgressBar.Horizontal">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">10dp</item>
+        <item name="android:max">255</item>
+        <item name="android:progressTint">?attr/colorPrimary</item>
+        <item name="android:progressBackgroundTint">?attr/colorSurfaceContainerHighest</item>
+    </style>
+
+    <style name="SignedAxisBar" parent="AxisBar">
+        <item name="android:max">65535</item>
+    </style>
+
+    <!-- ════════════════════════════════════════════════════════════════════════
+         DebugActivity. Two columns on a wide screen, one on a narrow one - the same
+         style-override trick MainPair uses, so the markup exists once.
+         ════════════════════════════════════════════════════════════════════════ -->
+    <style name="Debug.Columns.Base">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:baselineAligned">false</item>
+    </style>
+
+    <style name="Debug.Columns" parent="Debug.Columns.Base">
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="Debug.Col.Left" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:layout_marginBottom">@dimen/debug_col_gap</item>
+    </style>
+
+    <style name="Debug.Col.Right" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <!-- One card per concept: all the inputs, then the axes, then the raw dump. The old
+         layout had ten flat sections with no surface between them. -->
+    <style name="Debug.Group" parent="DebugCard">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginBottom">@dimen/debug_group_gap</item>
+    </style>
+
+    <style name="Debug.GroupBody" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:padding">@dimen/card_pad</item>
+    </style>
+
+    <style name="Debug.ChipRow" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center</item>
+        <item name="android:layout_marginTop">@dimen/debug_chip_gap</item>
+    </style>
+
+    <!-- Chip margins live here rather than repeated on every TextView. -->
+    <style name="Debug.Chip" parent="BtnChip">
+        <item name="android:layout_margin">@dimen/debug_chip_gap</item>
+    </style>
+
+    <style name="Debug.ChipCircle" parent="BtnChipCircle">
+        <item name="android:layout_margin">@dimen/debug_chip_gap</item>
+    </style>
+
+    <!-- X and Y of one axis side by side: value above its bar. -->
+    <style name="Debug.AxisPair" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:baselineAligned">false</item>
+        <item name="android:layout_marginBottom">@dimen/debug_group_gap</item>
+    </style>
+
+    <style name="Debug.AxisCol" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <!-- AxisValFull is 0dp+weight=1, which only works inside a horizontal row; this is the
+         vertical-column equivalent so the value sits above its own bar. -->
+    <style name="Debug.AxisValue" parent="AxisVal">
+        <item name="android:layout_width">match_parent</item>
+    </style>
+
+    <style name="DebugCard" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="cardBackgroundColor">?attr/colorSurfaceContainerLow</item>
+        <item name="strokeColor">?attr/colorOutlineVariant</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <style name="DebugSectionTitle" parent="SectionLabel">
+        <item name="android:textSize">11sp</item>
+        <item name="android:letterSpacing">0.18</item>
     </style>
 
     <style name="HelpParagraph">
@@ -54,59 +431,113 @@
     <style name="HelpSectionLabel">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
+        <!-- Space ABOVE the heading. Without it a section label sat flush under the previous
+             bullet, which is what made the wired heading look bolted on. -->
+        <item name="android:layout_marginTop">@dimen/block_gap</item>
         <item name="android:textColor">?attr/colorPrimary</item>
         <item name="android:textSize">14sp</item>
         <item name="android:textStyle">bold</item>
         <item name="android:layout_marginBottom">8dp</item>
     </style>
 
-    <style name="AxisValFull">
-        <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_weight">1</item>
-        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
-        <item name="android:textSize">11sp</item>
-        <item name="android:fontFamily">monospace</item>
-    </style>
-
-    <!-- V1.2 — circular chip for face buttons / DPAD / stick clicks. -->
-    <style name="BtnChipCircle">
-        <item name="android:layout_width">44dp</item>
-        <item name="android:layout_height">44dp</item>
-        <item name="android:gravity">center</item>
-        <item name="android:background">@drawable/chip_circle_bg</item>
-        <item name="android:textColor">@color/chip_inactive</item>
-        <item name="android:textSize">14sp</item>
-        <item name="android:fontFamily">monospace</item>
-        <item name="android:textStyle">bold</item>
-    </style>
-
-    <!-- V1.2 — taller bar graph row used for stick / trackpad / trigger axes.
-         Combines a horizontal ProgressBar with a monospace value label. -->
-    <style name="AxisBar" parent="Widget.AppCompat.ProgressBar.Horizontal">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">10dp</item>
-        <item name="android:max">255</item>
-        <item name="android:progressTint">?attr/colorPrimary</item>
-    </style>
-
-    <!-- V1.2 DebugActivity — common section card. -->
-    <style name="DebugCard" parent="">
+    <!-- ════════════════════════════════════════════════════════════════════════
+         CalibrationActivity. This screen was 405 lines of hand-written colour, size and
+         spacing per variant and not one custom style. It is four cards on the shared tokens
+         now: one column on a handheld, two on a wide screen.
+         ════════════════════════════════════════════════════════════════════════ -->
+    <style name="Calib.Columns.Base">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="cardCornerRadius">18dp</item>
-        <item name="cardElevation">0dp</item>
-        <item name="strokeColor">?attr/colorOutlineVariant</item>
-        <item name="strokeWidth">1dp</item>
+        <item name="android:baselineAligned">false</item>
     </style>
 
-    <style name="DebugSectionTitle" parent="">
+    <style name="Calib.Columns" parent="Calib.Columns.Base">
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <!-- Sticks down one side, the three settings cards stacked down the other. Card spacing
+         lives on the card, not the column, so it works in both arrangements. -->
+    <style name="Calib.Col.Left" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="Calib.Col.Right" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="Calib.Card" parent="DebugCard">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginBottom">@dimen/block_gap</item>
+    </style>
+
+    <style name="Calib.GroupBody" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:padding">@dimen/card_pad</item>
+    </style>
+
+    <style name="Calib.Field" parent="">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:textColor">?attr/colorPrimary</item>
-        <item name="android:textStyle">bold</item>
-        <item name="android:textSize">11sp</item>
-        <item name="android:letterSpacing">0.18</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:textSize">@dimen/calib_field_size</item>
+    </style>
+
+    <style name="Calib.Value" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textSize">@dimen/calib_value_size</item>
+    </style>
+
+    <style name="Calib.Hint" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textSize">@dimen/calib_hint_size</item>
+        <item name="android:layout_marginTop">@dimen/debug_chip_gap</item>
+    </style>
+
+    <style name="Calib.Switch" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:textSize">@dimen/calib_field_size</item>
+    </style>
+
+    <!-- Sliders dressed in the app's own tokens rather than Material's defaults: a muted
+         inactive track so the row stops glowing, and the accent only where it is doing
+         something. A full-strength halo around a thumb at rest reads as "already selected",
+         so it is toned down to the same wash a focused surface uses. -->
+    <style name="Calib.Slider" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="trackColorActive">@color/accent</item>
+        <item name="trackColorInactive">@color/surface_4</item>
+        <item name="thumbColor">@color/accent</item>
+        <item name="haloColor">@color/accent_container</item>
+        <item name="trackHeight">4dp</item>
+        <item name="thumbRadius">9dp</item>
+        <item name="haloRadius">16dp</item>
+    </style>
+
+    <!-- Same shape and states as the segmented toggles on the main screen, so every
+         non-primary button in the app reads the same way. -->
+    <style name="Calib.SecondaryButton" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/segment_height</item>
+        <item name="android:textColor">@color/segment_text</item>
+        <item name="android:textSize">@dimen/segment_text_size</item>
+        <item name="strokeColor">@color/segment_stroke</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cornerRadius">@dimen/segment_radius</item>
     </style>
 
 </resources>

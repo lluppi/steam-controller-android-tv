@@ -8,7 +8,7 @@ package com.steamcontroller.android.uinput
  * DualSense options could never actually behave like those devices: they would advertise Sony or
  * Microsoft IDs while reporting an Xbox layout, with no touchpad and none of the vendor-specific
  * reporting those pads are matched on. Games and RetroArch both match on identity, so offering
- * them was misleading rather than useful — and for the uinput backend they only ever changed which
+ * them was misleading rather than useful - and for the uinput backend they only ever changed which
  * keylayout file matched.
  *
  * [MOUSE] is not a variant: it is a different device set (mouse + keyboard, no gamepad) and has its

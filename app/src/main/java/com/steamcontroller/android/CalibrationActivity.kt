@@ -76,7 +76,7 @@ class CalibrationActivity : AppCompatActivity() {
             startService(intent)
         }
 
-        // Rumble intensity slider — applied live to all subsequent rumble events
+        // Rumble intensity slider - applied live to all subsequent rumble events
         val savedIntensity = Prefs.getRumbleIntensity(this)
         binding.sliderRumbleIntensity.value = savedIntensity.toFloat()
         binding.tvRumbleIntensity.text = "$savedIntensity%"
@@ -88,7 +88,7 @@ class CalibrationActivity : AppCompatActivity() {
             }
         )
 
-        // Mouse sensitivity slider — only relevant in Desktop profile but always visible
+        // Mouse sensitivity slider - only relevant in Desktop profile but always visible
         val savedSens = Prefs.getMouseSensitivity(this)
         binding.sliderMouseSensitivity.value = savedSens
         binding.tvMouseSensitivity.text = "%.1f×".format(savedSens)

@@ -81,12 +81,12 @@ enum class SteamButton(val mask: Int, val displayName: String, val category: But
 }
 
 /**
- * Target buttons exposed by the virtual gamepad (Xbox layout — Android maps
+ * Target buttons exposed by the virtual gamepad (Xbox layout - Android maps
  * these consistently across all profiles).
  *
  * Four flavours coexist:
  *  - `mask > 0`            : regular Xbox button (OR into the gamepad button mask).
- *  - `keyBit >= 0`         : sidecar keyboard key — emitted via the mouse+kbd sidecar
+ *  - `keyBit >= 0`         : sidecar keyboard key - emitted via the mouse+kbd sidecar
  *                            device that always runs alongside a gamepad profile.
  *                            Bit value matches MouseTarget so we reuse the same JNI path.
  *  - `triggerSide != 0`    : forces an analog trigger axis to max (1=LT, 2=RT) when the
@@ -171,7 +171,7 @@ enum class XboxTarget(
     }
 }
 
-/** Default mapping — reproduces the hardcoded mapping that existed before this feature. */
+/** Default mapping - reproduces the hardcoded mapping that existed before this feature. */
 val DEFAULT_MAPPING: Map<SteamButton, XboxTarget> = mapOf(
     SteamButton.A to XboxTarget.A,
     SteamButton.B to XboxTarget.B,
@@ -188,7 +188,7 @@ val DEFAULT_MAPPING: Map<SteamButton, XboxTarget> = mapOf(
     SteamButton.MENU to XboxTarget.START,
     SteamButton.VIEW to XboxTarget.SELECT,
     SteamButton.STEAM to XboxTarget.MODE,
-    SteamButton.QUICK_ACCESS to XboxTarget.NONE, // No default — user assigns
+    SteamButton.QUICK_ACCESS to XboxTarget.NONE, // No default - user assigns
     // Back paddles default to the stick clicks. Those are what emulators use for save/load state
     // (RetroArch's BUTTON_THUMBL/THUMBR, keycodes 106/107), so the paddles do something useful out
     // of the box instead of nothing. L5/R5 stay free for the user.
