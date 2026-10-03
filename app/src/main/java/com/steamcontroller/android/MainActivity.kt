@@ -54,21 +54,18 @@ class MainActivity : AppCompatActivity() {
 
     private val usbReceiver =
         object : BroadcastReceiver() {
-            override fun onReceive(
-                context: Context,
-                intent: Intent,
-            ) {
+            override fun onReceive(context: Context, intent: Intent) {
                 when (intent.action) {
                     usbPermissionAction -> {
                         val granted =
                             intent.getBooleanExtra(
                                 UsbManager.EXTRA_PERMISSION_GRANTED,
-                                false,
+                                false
                             )
                         if (granted) {
                             val device: UsbDevice? =
                                 intent.getParcelableExtra(
-                                    UsbManager.EXTRA_DEVICE,
+                                    UsbManager.EXTRA_DEVICE
                                 )
                             device?.let { startControllerService(it) }
                         } else {
@@ -77,7 +74,7 @@ class MainActivity : AppCompatActivity() {
                                 .makeText(
                                     this@MainActivity,
                                     "USB permission denied",
-                                    Toast.LENGTH_SHORT,
+                                    Toast.LENGTH_SHORT
                                 ).show()
                         }
                     }
@@ -110,7 +107,7 @@ class MainActivity : AppCompatActivity() {
                     .makeText(
                         this,
                         getString(R.string.shizuku_permission_denied),
-                        Toast.LENGTH_LONG,
+                        Toast.LENGTH_LONG
                     ).show()
             }
         }
@@ -134,7 +131,7 @@ class MainActivity : AppCompatActivity() {
             this,
             usbReceiver,
             filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED,
+            ContextCompat.RECEIVER_NOT_EXPORTED
         )
         binding.btnToggleService.setOnClickListener {
             if (serviceRunning) {
@@ -237,7 +234,7 @@ class MainActivity : AppCompatActivity() {
                 binding.btnCalibration,
                 binding.btnMapping,
                 binding.btnGameProfiles,
-                binding.btnDebug,
+                binding.btnDebug
             )
         // Matches the layout's default; used until a card has been visited this session.
         binding.btnToggleService.nextFocusDownId = binding.btnCalibration.id
@@ -322,7 +319,7 @@ class MainActivity : AppCompatActivity() {
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
-        grantResults: IntArray,
+        grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 9002 && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
@@ -395,7 +392,7 @@ class MainActivity : AppCompatActivity() {
 
                     override fun publishResults(
                         constraint: CharSequence?,
-                        results: FilterResults?,
+                        results: FilterResults?
                     ) {
                         notifyDataSetChanged()
                     }
@@ -416,7 +413,7 @@ class MainActivity : AppCompatActivity() {
         binding.tvMode.text =
             when (state.mode) {
                 ControllerService.InjectionMode.UINPUT,
-                ControllerService.InjectionMode.UHID,
+                ControllerService.InjectionMode.UHID
                 -> {
                     "$profileName ($backend) ✓"
                 }
@@ -439,10 +436,7 @@ class MainActivity : AppCompatActivity() {
     private fun showConnectionHelpDialog() {
         val view = layoutInflater.inflate(R.layout.dialog_connection_help, null)
 
-        fun fillBullet(
-            id: Int,
-            html: String,
-        ) {
+        fun fillBullet(id: Int, html: String) {
             val row = view.findViewById<View>(id)
             val tv = row.findViewById<android.widget.TextView>(R.id.bulletText)
             tv.text = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT)
@@ -450,23 +444,23 @@ class MainActivity : AppCompatActivity() {
 
         fillBullet(
             R.id.bulletPuckRight,
-            "<b>Puck (right slot)</b> - hold <b>A + R1 + Steam</b>, chime + white LED.",
+            "<b>Puck (right slot)</b> - hold <b>A + R1 + Steam</b>, chime + white LED."
         )
         fillBullet(
             R.id.bulletPuckLeft,
-            "<b>Puck (left slot)</b> - hold <b>A + L1 + Steam</b>, chime + white LED.",
+            "<b>Puck (left slot)</b> - hold <b>A + L1 + Steam</b>, chime + white LED."
         )
         fillBullet(
             R.id.bulletBluetooth,
-            "<b>Bluetooth</b> - hold <b>B + R1 + Steam</b>, chime + blue LED.",
+            "<b>Bluetooth</b> - hold <b>B + R1 + Steam</b>, chime + blue LED."
         )
         fillBullet(
             R.id.bulletWiredOff,
-            "Controller is <b>off</b> - plug it into the device. Chime + green LED.",
+            "Controller is <b>off</b> - plug it into the device. Chime + green LED."
         )
         fillBullet(
             R.id.bulletWiredOn,
-            "Controller is <b>on</b> in another mode - hold <b>Steam</b> while plugging it in. Chime + green LED.",
+            "Controller is <b>on</b> in another mode - hold <b>Steam</b> while plugging it in. Chime + green LED."
         )
 
         MaterialAlertDialogBuilder(this)
@@ -532,7 +526,7 @@ class MainActivity : AppCompatActivity() {
                     .makeText(
                         this,
                         getString(R.string.shizuku_not_running),
-                        Toast.LENGTH_LONG,
+                        Toast.LENGTH_LONG
                     ).show()
             }
 
@@ -583,7 +577,7 @@ class MainActivity : AppCompatActivity() {
                     this,
                     0,
                     Intent(usbPermissionAction).setPackage(packageName),
-                    PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                    PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )
             usbManager.requestPermission(device, permIntent)
             log("Requesting USB permission...")
@@ -701,22 +695,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun isShizukuInstalled(): Boolean =
-        try {
-            packageManager.getPackageInfo(shizukuPackage, 0)
-            true
-        } catch (_: PackageManager.NameNotFoundException) {
-            false
-        } catch (_: Throwable) {
-            true
-        }
+    private fun isShizukuInstalled(): Boolean = try {
+        packageManager.getPackageInfo(shizukuPackage, 0)
+        true
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    } catch (_: Throwable) {
+        true
+    }
 
     private fun openShizukuInstall() {
         val targets =
             listOf(
                 "market://details?id=$shizukuPackage",
                 "https://play.google.com/store/apps/details?id=$shizukuPackage",
-                "https://github.com/RikkaApps/Shizuku/releases/latest",
+                "https://github.com/RikkaApps/Shizuku/releases/latest"
             )
         for (target in targets) {
             try {
@@ -728,13 +721,12 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, R.string.main_shizuku_store_failed, Toast.LENGTH_LONG).show()
     }
 
-    private fun hasShizukuAccess(): Boolean =
-        try {
-            Shizuku.pingBinder() &&
-                Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-        } catch (_: Throwable) {
-            false
-        }
+    private fun hasShizukuAccess(): Boolean = try {
+        Shizuku.pingBinder() &&
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+    } catch (_: Throwable) {
+        false
+    }
 
     private fun updateShizukuStatus(ok: Boolean) {
         val transport = Prefs.getTransport(this).displayName
@@ -748,12 +740,11 @@ class MainActivity : AppCompatActivity() {
         binding.tvShizukuStatus.text = "Shizuku: $prerequisite  •  $transport"
     }
 
-    private fun shizukuRunning(): Boolean =
-        try {
-            Shizuku.pingBinder()
-        } catch (_: Throwable) {
-            false
-        }
+    private fun shizukuRunning(): Boolean = try {
+        Shizuku.pingBinder()
+    } catch (_: Throwable) {
+        false
+    }
 
     /**
      * The status card. Driven by [ControllerService.linkStatusFlow], not by "is the service
@@ -813,7 +804,7 @@ class MainActivity : AppCompatActivity() {
             startService(
                 Intent(this, ControllerService::class.java).apply {
                     action = ControllerService.ACTION_RECONNECT
-                },
+                }
             )
             return
         }
@@ -821,7 +812,7 @@ class MainActivity : AppCompatActivity() {
             startService(
                 Intent(this, ControllerService::class.java).apply {
                     action = ControllerService.ACTION_RESTART
-                },
+                }
             )
             serviceRunning = false
         }

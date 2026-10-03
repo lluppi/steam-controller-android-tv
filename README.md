@@ -135,7 +135,6 @@ debug builds install side by side with a release build (`applicationIdSuffix = "
 | --- | --- |
 | no rumble on `uhid` | `hid-generic` implements no force feedback for these descriptors, so games' rumble requests never arrive. calibration says so instead of offering a dead test button |
 | usb rumble | not implemented - the controller only vibrates over bluetooth |
-| left trackpad click | not reported anywhere in the controller's vendor report, so it cannot be mapped. the right pad clicks, the left pad scrolls |
 | trackpads | usable as a mouse, not yet exposed as a ds4/ds5 touchpad to games that support one natively |
 | gyroscope | gyro aiming is mixed into the right stick (tuned and bias-calibrated on the calibration screen). games never see a real motion sensor |
 | steam button | passes through as `KEYCODE_BUTTON_MODE`, android treats it as the system guide key and may open the launcher |
@@ -143,24 +142,3 @@ debug builds install side by side with a release build (`applicationIdSuffix = "
 | rumble byte format | empirically tuned from the linux `hid-steam` driver |
 | inject fallback | where selinux refuses both backends the app injects input events, which most apps ignore |
 
-## roadmap
-
-- usb rumble
-- trackpad as a real touchpad input (ds4/ds5 profile)
-- gyro as a native motion sensor for ds4 / ds5
-- rumble without `uinput` (dualshock 4 emulation via `hid-sony`, present on the shield's kernel)
-- retroarch autoconfig profiles and back-paddle presets
-- hid debug log export ("log to file")
-
-## credits
-
-- [steamlesscontroller](https://github.com/ddeverill/SteamlessController) by ddeverill - the `SteamController.h` byte layout reference for the sc2026
-- the [linux kernel `hid-steam` driver](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-steam.c) for additional validation of button bit positions and the rumble command structure
-- [shizuku](https://github.com/RikkaApps/Shizuku) by rikkaapps - the `uinput` access path without root
-- the [android usb host api](https://developer.android.com/guide/topics/connectivity/usb/host) and the ble gatt stack
-- [kenney input prompts](https://kenney.nl/assets/input-prompts) (cc0) - the button glyphs on the mapping screen
-- [material components for android](https://github.com/material-components/material-components-android) for the material 3 ui
-
-## license
-
-mit - see [LICENSE](LICENSE), which carries upstream's copyright and this fork's.
