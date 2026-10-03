@@ -229,7 +229,7 @@
          Stacked on a phone, side by side on TV. Layout attributes that are not
          dimensions (orientation, weight, width) cannot come from dimens.xml, so they
          come from here and values-television/styles.xml overrides the pair. -->
-    <style name="Main.Pair.Base">
+    <style name="Main.Pair.Base" parent="">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:baselineAligned">false</item>
@@ -327,7 +327,7 @@
          DebugActivity. Two columns on a wide screen, one on a narrow one - the same
          style-override trick MainPair uses, so the markup exists once.
          ════════════════════════════════════════════════════════════════════════ -->
-    <style name="Debug.Columns.Base">
+    <style name="Debug.Columns.Base" parent="">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:baselineAligned">false</item>
@@ -445,7 +445,7 @@
          spacing per variant and not one custom style. It is four cards on the shared tokens
          now: one column on a handheld, two on a wide screen.
          ════════════════════════════════════════════════════════════════════════ -->
-    <style name="Calib.Columns.Base">
+    <style name="Calib.Columns.Base" parent="">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:baselineAligned">false</item>

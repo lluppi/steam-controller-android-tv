@@ -3,6 +3,9 @@ package com.steamcontroller.android.uinput
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 // Bound by Shizuku.bindUserService() - this code runs in a separate process with the
@@ -188,35 +191,67 @@ class UInputService : IUInputService.Stub {
 
     override fun runShellCommand(cmd: Array<String>?): Int {
         touch()
-        if (cmd.isNullOrEmpty()) return -1
-        return try {
-            val proc =
-                ProcessBuilder(cmd.toList())
-                    .redirectErrorStream(true)
-                    .start()
-            val exit = proc.waitFor()
-            Log.i(TAG, "runShellCommand ${cmd.joinToString(" ")} → exit=$exit")
-            exit
-        } catch (t: Throwable) {
-            Log.e(TAG, "runShellCommand failed: ${t.message}")
-            -1
-        }
+        return runAllowed(cmd)?.exit ?: -1
     }
 
     override fun runShellCommandForOutput(cmd: Array<String>?): String? {
         touch()
-        if (cmd.isNullOrEmpty()) return null
+        return runAllowed(cmd)?.takeIf { it.exit == 0 }?.output?.trim()
+    }
+
+    private class ShellResult(val exit: Int, val output: String)
+
+    /**
+     * Runs [cmd] as the shell uid only if [ShellAllowlist] permits it. Output is drained while the
+     * child runs (so a chatty command cannot block on a full pipe), capped at
+     * [ShellAllowlist.MAX_OUTPUT_BYTES], and the child is killed after
+     * [ShellAllowlist.TIMEOUT_MS] - well inside the liveness watchdog's window.
+     */
+    private fun runAllowed(cmd: Array<String>?): ShellResult? {
+        if (cmd == null || !ShellAllowlist.isAllowed(cmd)) {
+            Log.w(TAG, "refused shell command: ${cmd?.joinToString(" ")}")
+            return null
+        }
+        var proc: Process? = null
         return try {
-            val proc =
-                ProcessBuilder(cmd.toList())
-                    .redirectErrorStream(true)
-                    .start()
-            val output = proc.inputStream.bufferedReader().readText()
-            proc.waitFor()
-            output.trim()
+            proc = ProcessBuilder(cmd.toList()).redirectErrorStream(true).start()
+            proc.outputStream.close()
+            val buffer = ByteArrayOutputStream()
+            val stream = proc.inputStream
+            val reader =
+                Thread({
+                    val chunk = ByteArray(4096)
+                    try {
+                        while (true) {
+                            val n = stream.read(chunk)
+                            if (n < 0) break
+                            val room = ShellAllowlist.MAX_OUTPUT_BYTES - buffer.size()
+                            if (room > 0) buffer.write(chunk, 0, minOf(n, room))
+                        }
+                    } catch (_: IOException) {
+                    }
+                }, "shell-output")
+            reader.isDaemon = true
+            reader.start()
+            if (!proc.waitFor(ShellAllowlist.TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                Log.w(TAG, "shell command timed out: ${cmd.joinToString(" ")}")
+                return null
+            }
+            reader.join(1_000)
+            val exit = proc.exitValue()
+            Log.i(TAG, "shell ${cmd.joinToString(" ")} → exit=$exit")
+            ShellResult(exit, buffer.toString(Charsets.UTF_8.name()))
         } catch (t: Throwable) {
-            Log.e(TAG, "runShellCommandForOutput failed: ${t.message}")
+            Log.e(TAG, "shell command failed: ${t.message}")
             null
+        } finally {
+            proc?.let {
+                try {
+                    it.inputStream.close()
+                } catch (_: Throwable) {
+                }
+                it.destroyForcibly()
+            }
         }
     }
 

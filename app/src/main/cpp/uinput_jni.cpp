@@ -8,12 +8,19 @@
 #include "hid_common.h"
 
 #include <jni.h>
+#include <mutex>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
 namespace {
+
+// Binder calls arrive on several threads and the liveness watchdog can tear devices down from
+// another, while the backends themselves are single-threaded. Every entry point holds this.
+// All backend calls are non-blocking (bar a bounded poll during device creation), so frames
+// never wait long behind each other.
+std::mutex g_lock;
 
 OutputBackend* g_backend = nullptr;
 int g_backend_id = BACKEND_NONE;
@@ -47,6 +54,9 @@ size_t appendDetail(size_t offset, const char* format, ...) {
 // Probe every candidate so the UI can explain what happened, but only adopt one:
 // `preferred` of PREF_AUTO accepts anything available, otherwise the requested backend.
 void selectBackend(int preferred) {
+    // Whatever the previous backend created must not outlive the switch, or a uinput -> uhid
+    // change would leave the old devices registered next to the new ones.
+    if (g_backend != nullptr) g_backend->destroyDevices();
     g_backend = nullptr;
     g_backend_id = BACKEND_NONE;
 
@@ -78,28 +88,42 @@ void selectBackend(int preferred) {
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_steamcontroller_android_uinput_UInputNative_selectBackend(JNIEnv*, jclass, jint preferred) {
+    std::lock_guard<std::mutex> lock(g_lock);
     selectBackend(preferred);
     return g_backend_id;
 }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_steamcontroller_android_uinput_UInputNative_currentBackend(JNIEnv*, jclass) {
+    std::lock_guard<std::mutex> lock(g_lock);
     return g_backend_id;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_steamcontroller_android_uinput_UInputNative_backendDetail(JNIEnv* env, jclass) {
-    return env->NewStringUTF(g_detail);
+    std::lock_guard<std::mutex> lock(g_lock);
+    // g_detail embeds strerror() text; keep it 7-bit so NewStringUTF never sees invalid
+    // modified UTF-8.
+    char ascii[sizeof(g_detail)];
+    size_t i = 0;
+    for (; i < sizeof(ascii) - 1 && g_detail[i] != '\0'; i++) {
+        const unsigned char c = (unsigned char)g_detail[i];
+        ascii[i] = c < 0x80 ? (char)c : '?';
+    }
+    ascii[i] = '\0';
+    return env->NewStringUTF(ascii);
 }
 
 // Whether games can receive rumble through the selected backend.
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_steamcontroller_android_uinput_UInputNative_supportsRumble(JNIEnv*, jclass) {
+    std::lock_guard<std::mutex> lock(g_lock);
     return g_backend != nullptr && g_backend->supportsRumble() ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_steamcontroller_android_uinput_UInputNative_createDevice(JNIEnv*, jclass, jint profileId) {
+    std::lock_guard<std::mutex> lock(g_lock);
     if (g_backend == nullptr) {
         LOGE("createDevice called with no backend selected");
         return JNI_FALSE;
@@ -114,6 +138,7 @@ Java_com_steamcontroller_android_uinput_UInputNative_sendFrame(
         jint lx, jint ly, jint rx, jint ry,
         jint lt, jint rt,
         jint dpadX, jint dpadY) {
+    std::lock_guard<std::mutex> lock(g_lock);
     if (g_backend == nullptr) return;
     g_backend->sendFrame(buttons, lx, ly, rx, ry, lt, rt, dpadX, dpadY);
 }
@@ -121,19 +146,23 @@ Java_com_steamcontroller_android_uinput_UInputNative_sendFrame(
 extern "C" JNIEXPORT void JNICALL
 Java_com_steamcontroller_android_uinput_UInputNative_sendMouseFrame(
         JNIEnv*, jclass, jint relX, jint relY, jint scrollY, jint keys) {
+    std::lock_guard<std::mutex> lock(g_lock);
     if (g_backend == nullptr) return;
     g_backend->sendMouseFrame(relX, relY, scrollY, keys);
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_steamcontroller_android_uinput_UInputNative_pollFFEvent(JNIEnv* env, jclass) {
-    if (g_backend == nullptr) return nullptr;
-
     int32_t strong = 0;
     int32_t weak = 0;
-    if (!g_backend->pollForceFeedback(&strong, &weak)) return nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_lock);
+        if (g_backend == nullptr) return nullptr;
+        if (!g_backend->pollForceFeedback(&strong, &weak)) return nullptr;
+    }
 
     jintArray result = env->NewIntArray(2);
+    if (result == nullptr) return nullptr;  // OutOfMemoryError is pending
     const jint values[2] = { strong, weak };
     env->SetIntArrayRegion(result, 0, 2, values);
     return result;
@@ -141,6 +170,7 @@ Java_com_steamcontroller_android_uinput_UInputNative_pollFFEvent(JNIEnv* env, jc
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_steamcontroller_android_uinput_UInputNative_destroy(JNIEnv*, jclass) {
+    std::lock_guard<std::mutex> lock(g_lock);
     if (g_backend == nullptr) return;
     g_backend->destroyDevices();
     LOGI("Virtual devices destroyed (%s)", g_backend->name());

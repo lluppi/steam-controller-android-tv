@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
+import com.steamcontroller.android.uinput.ShellAllowlist
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -31,7 +32,7 @@ object SystemActions {
         Thread({
             try {
                 val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                val dir = "/sdcard/Pictures/Screenshots"
+                val dir = ShellAllowlist.SCREENSHOT_DIR
                 val path = "$dir/SteamCtrl_$timestamp.png"
 
                 runShell(arrayOf("mkdir", "-p", dir))

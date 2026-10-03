@@ -28,7 +28,7 @@ public:
     const char* probeDetail() const override { return detail_; }
 
     bool probe() override {
-        const int fd = ::open(UINPUT_PATH, O_WRONLY | O_NONBLOCK);
+        const int fd = ::open(UINPUT_PATH, O_WRONLY | O_NONBLOCK | O_CLOEXEC);
         if (fd < 0) {
             snprintf(detail_, sizeof(detail_), "%s", strerror(errno));
             return false;
@@ -47,9 +47,9 @@ public:
 
         if (prof.mouse_mode) {
             // Desktop: just mouse + keyboard, no gamepad.
-            const int mouse_fd = create_mouse_fd(prof.vid, prof.pid);
+            const int mouse_fd = create_mouse_fd(prof.vid, sidecar_mouse_pid(prof));
             if (mouse_fd < 0) return false;
-            const int kbd_fd = create_keyboard_fd(prof.vid, prof.pid, /*full_alpha=*/true);
+            const int kbd_fd = create_keyboard_fd(prof.vid, sidecar_keyboard_pid(prof), /*full_alpha=*/true);
             if (kbd_fd < 0) {
                 ioctl(mouse_fd, UI_DEV_DESTROY);
                 close(mouse_fd);
@@ -64,7 +64,7 @@ public:
         // Gamepad path — the gamepad itself plus a mouse and a keyboard sidecar. The
         // sidecar pair lets the right trackpad drive a cursor and lets back-paddle
         // mappings hit keyboard keys, while games still see a proper gamepad.
-        const int fd = open(UINPUT_PATH, O_RDWR | O_NONBLOCK);
+        const int fd = open(UINPUT_PATH, O_RDWR | O_NONBLOCK | O_CLOEXEC);
         if (fd < 0) {
             LOGE("open %s failed: %s", UINPUT_PATH, strerror(errno));
             return false;
@@ -102,11 +102,11 @@ public:
         fd_gamepad_ = fd;
 
         // Sidecar mouse + keyboard — non-fatal if either fails (gamepad still works).
-        fd_mouse_ = create_mouse_fd(prof.vid, (uint16_t)(prof.pid + 0x100));
+        fd_mouse_ = create_mouse_fd(prof.vid, sidecar_mouse_pid(prof));
         if (fd_mouse_ < 0) {
             LOGE("Sidecar mouse creation failed — trackpad-as-cursor will be unavailable");
         }
-        fd_kbd_ = create_keyboard_fd(prof.vid, (uint16_t)(prof.pid + 0x200), /*full_alpha=*/false);
+        fd_kbd_ = create_keyboard_fd(prof.vid, sidecar_keyboard_pid(prof), /*full_alpha=*/false);
         if (fd_kbd_ < 0) {
             LOGE("Sidecar keyboard creation failed — key mappings on back paddles will be unavailable");
         }
@@ -347,7 +347,7 @@ private:
 
     // Pure mouse device: EV_REL + 3 mouse buttons.
     static int create_mouse_fd(uint16_t vid, uint16_t pid) {
-        const int fd = open(UINPUT_PATH, O_WRONLY | O_NONBLOCK);
+        const int fd = open(UINPUT_PATH, O_WRONLY | O_NONBLOCK | O_CLOEXEC);
         if (fd < 0) { LOGE("open %s (mouse) failed: %s", UINPUT_PATH, strerror(errno)); return -1; }
         const bool ok = set_bit(fd, UI_SET_EVBIT,  EV_KEY)
                      && set_bit(fd, UI_SET_EVBIT,  EV_REL)
@@ -379,7 +379,7 @@ private:
     // The uhid backend has to express the same distinction in its descriptor instead
     // (see UHID_KBD_DESKTOP_RD / UHID_KBD_MINIMAL_RD in hid_descriptors.h).
     static int create_keyboard_fd(uint16_t vid, uint16_t pid, bool full_alpha) {
-        const int fd = open(UINPUT_PATH, O_WRONLY | O_NONBLOCK);
+        const int fd = open(UINPUT_PATH, O_WRONLY | O_NONBLOCK | O_CLOEXEC);
         if (fd < 0) { LOGE("open %s (kbd) failed: %s", UINPUT_PATH, strerror(errno)); return -1; }
 
         bool ok = set_bit(fd, UI_SET_EVBIT, EV_KEY) && set_bit(fd, UI_SET_EVBIT, EV_SYN);
@@ -413,7 +413,7 @@ private:
         }
 
         // PID +1 keeps a stable, distinct identity vs the mouse half.
-        if (!ok || finalize_device(fd, vid, (uint16_t)(pid + 1), "Steam Controller Keyboard", 0) < 0) {
+        if (!ok || finalize_device(fd, vid, pid, "Steam Controller Keyboard", 0) < 0) {
             close(fd);
             return -1;
         }

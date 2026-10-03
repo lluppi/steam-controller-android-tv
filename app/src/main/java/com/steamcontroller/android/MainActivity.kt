@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
     private var hasSeenActiveMode = false
 
     private val usbPermissionAction = "com.steamcontroller.android.USB_PERMISSION"
-    private val githubRepoUrl = "https://github.com/SonicDX12/SteamController-Android"
+    private val githubRepoUrl = "https://github.com/lluppi/steam-controller-android-tv"
     private val shizukuPackage = ShizukuStarterService.SHIZUKU_PACKAGE
     private val tvSettingsStubPackage = "com.google.android.tv.frameworkpackagestubs"
 

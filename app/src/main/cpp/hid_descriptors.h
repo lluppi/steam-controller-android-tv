@@ -20,6 +20,11 @@
 inline constexpr uint8_t UHID_REPORT_ID_KEYBOARD = 1;
 inline constexpr uint8_t UHID_REPORT_ID_CONSUMER = 2;
 inline constexpr int UHID_KBD_ARRAY_SLOTS = 6;
+// The minimal (gamepad-mode) keyboard splits those slots into two array fields, see
+// UHID_KBD_MINIMAL_RD: Enter..Space first, then Home..Up.
+inline constexpr int UHID_KBD_MINIMAL_MAIN_SLOTS = 2;
+inline constexpr uint8_t UHID_KBD_MINIMAL_NAV_MIN = 0x4A;  // Home
+inline constexpr uint8_t UHID_KBD_MINIMAL_NAV_MAX = 0x52;  // Up Arrow
 
 inline constexpr size_t UHID_GAMEPAD_REPORT_SIZE = 13;
 inline constexpr size_t UHID_MOUSE_REPORT_SIZE = 6;

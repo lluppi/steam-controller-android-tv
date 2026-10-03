@@ -48,11 +48,11 @@ jobs:
         run: |
           mkdir -p out
           cp app/build/outputs/apk/release/app-release.apk \
-             "out/SteamControllerAndroid-${GITHUB_REF_NAME}.apk"
+             "out/SteamControllerBridge-${GITHUB_REF_NAME}.apk"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: ${{ github.ref_name }}
           generate_release_notes: true
-          files: out/SteamControllerAndroid-*.apk
+          files: out/SteamControllerBridge-*.apk

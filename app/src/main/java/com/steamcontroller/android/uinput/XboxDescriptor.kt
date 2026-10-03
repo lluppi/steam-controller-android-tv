@@ -1,7 +1,7 @@
 package com.steamcontroller.android.uinput
 
 // Button bit layout sent over IPC to UInputService.
-// Order MUST match bit_to_key[] in uinput_jni.cpp.
+// Order MUST match XBOX_BUTTONS[] in cpp/hid_common.h.
 object XboxButtons {
     const val A = 1 shl 0
     const val B = 1 shl 1

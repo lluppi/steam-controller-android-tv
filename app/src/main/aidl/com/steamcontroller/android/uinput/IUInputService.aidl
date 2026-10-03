@@ -35,11 +35,11 @@ interface IUInputService {
     // or null if nothing happened since the last poll.
     int[] pollForceFeedback();
 
-    // Run an arbitrary shell command as the Shizuku shell user. Returns the exit code.
-    // Used for screenshot (screencap), and as a general escape hatch for future system actions.
+    // Run a shell command as the Shizuku shell user. Returns the exit code, or -1 if the command
+    // failed, timed out, or is not in ShellAllowlist - only the exact commands the app uses run.
     int runShellCommand(in String[] cmd);
 
-    // Same, but returns captured stdout (trimmed) instead of the exit code, or null on failure.
+    // Same, but returns captured stdout (trimmed, capped) instead of the exit code, or null on failure.
     // Used to read a Settings value before overriding it, so it can be restored later.
     String runShellCommandForOutput(in String[] cmd);
 

@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SteamControllerAndroid"
+rootProject.name = "SteamControllerBridge"
 include(":app")

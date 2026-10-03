@@ -80,7 +80,7 @@ public:
         // Mouse + keyboard. In Desktop mode both are essential; in gamepad mode they are
         // sidecars, so a failure is logged but doesn't take the gamepad down with it.
         const bool mouse_ok = create(mouse_, "mouse", "Steam Controller Mouse",
-                                     prof.vid, (uint16_t)(prof.pid + 0x100),
+                                     prof.vid, sidecar_mouse_pid(prof),
                                      UHID_MOUSE_RD, sizeof(UHID_MOUSE_RD));
         if (!mouse_ok) {
             LOGE("mouse device creation failed — trackpad-as-cursor will be unavailable");
@@ -88,8 +88,9 @@ public:
 
         const uint8_t* kbd_rd = desktop ? UHID_KBD_DESKTOP_RD : UHID_KBD_MINIMAL_RD;
         const size_t kbd_rd_size = desktop ? sizeof(UHID_KBD_DESKTOP_RD) : sizeof(UHID_KBD_MINIMAL_RD);
+        kbd_minimal_ = !desktop;
         const bool kbd_ok = create(kbd_, "keyboard", "Steam Controller Keyboard",
-                                   prof.vid, (uint16_t)(prof.pid + 0x200), kbd_rd, kbd_rd_size);
+                                   prof.vid, sidecar_keyboard_pid(prof), kbd_rd, kbd_rd_size);
         if (!kbd_ok) {
             LOGE("keyboard device creation failed — key mappings will be unavailable");
         }
@@ -145,13 +146,28 @@ public:
 
         if (kbd_.open()) {
             // Keyboard page keys go into the report's key array (one slot per held key).
+            // 0 = report id, 1 = modifiers, 2 = reserved, 3.. = key slots. The desktop
+            // descriptor has one 6-slot array covering every key; the minimal one splits it
+            // into Enter..Space (2 slots) and Home..Up (4 slots), and a key outside its
+            // field's logical range is dropped by the kernel, so each goes to its own field.
             uint8_t kbd[UHID_KBD_REPORT_SIZE] = {};
             kbd[0] = UHID_REPORT_ID_KEYBOARD;
-            int slot = 3;  // 0 = report id, 1 = modifiers, 2 = reserved
-            for (int i = 0; i < MK_COUNT && slot < 3 + UHID_KBD_ARRAY_SLOTS; i++) {
+            constexpr int first = 3;
+            constexpr int end = first + UHID_KBD_ARRAY_SLOTS;
+            int main_slot = first;
+            const int main_end = kbd_minimal_ ? first + UHID_KBD_MINIMAL_MAIN_SLOTS : end;
+            int nav_slot = main_end;
+            for (int i = 0; i < MK_COUNT; i++) {
                 if (!(kbd_bits & (1 << i))) continue;
                 const sidecar_key& key = SIDECAR_KEYS[i];
-                if (!key.consumer) kbd[slot++] = key.code;
+                if (key.consumer) continue;
+                const bool nav = kbd_minimal_ && key.code >= UHID_KBD_MINIMAL_NAV_MIN &&
+                                 key.code <= UHID_KBD_MINIMAL_NAV_MAX;
+                if (nav) {
+                    if (nav_slot < end) kbd[nav_slot++] = key.code;
+                } else if (main_slot < main_end) {
+                    kbd[main_slot++] = key.code;
+                }
             }
             sendReport(kbd_, kbd, sizeof(kbd));
 
@@ -202,6 +218,7 @@ private:
     // this, so adding a device stays a one-line change instead of three parallel edits.
     UhidDevice* const devices_[3] = { &gamepad_, &mouse_, &kbd_ };
     char detail_[64] = "not probed";
+    bool kbd_minimal_ = true;  // which keyboard descriptor kbd_ was created with
 
     static bool writeEvent(int fd, const char* kind, const uhid_event& event, const char* action) {
         if (::write(fd, &event, UHID_EVENT_SIZE) == (ssize_t)UHID_EVENT_SIZE) return true;
@@ -227,6 +244,10 @@ private:
 
     bool create(UhidDevice& dev, const char* kind, const char* name,
                 uint16_t vid, uint16_t pid, const uint8_t* rd, size_t rd_size) {
+        if (rd_size > HID_MAX_DESCRIPTOR_SIZE) {
+            LOGE("%s: %zu-byte descriptor exceeds the uhid maximum", kind, rd_size);
+            return false;
+        }
         const int fd = ::open(UHID_PATH, O_RDWR | O_CLOEXEC);
         if (fd < 0) {
             LOGE("%s: open %s failed: %s", kind, UHID_PATH, strerror(errno));
@@ -270,6 +291,7 @@ private:
             return;
         }
         uhid_event ev;
+        memset(&ev, 0, sizeof(ev));
         const ssize_t got = ::read(dev.fd, &ev, sizeof(ev));
         if (got < (ssize_t)sizeof(uint32_t)) {
             LOGE("%s: short read while waiting for UHID_START", dev.kind);
@@ -283,6 +305,10 @@ private:
     }
 
     bool sendReport(const UhidDevice& dev, const uint8_t* data, size_t len) {
+        if (len > UHID_DATA_MAX) {
+            LOGE("%s: %zu-byte report exceeds the uhid maximum", dev.kind, len);
+            return false;
+        }
         uhid_event ev;
         memset(&ev, 0, sizeof(ev));
         ev.type = UHID_INPUT2;
@@ -301,6 +327,7 @@ private:
                 struct pollfd pfd = { dev->fd, POLLIN, 0 };
                 if (::poll(&pfd, 1, 0) <= 0) break;
                 uhid_event ev;
+                memset(&ev, 0, sizeof(ev));
                 const ssize_t got = ::read(dev->fd, &ev, sizeof(ev));
                 if (got < (ssize_t)sizeof(uint32_t)) break;
                 handleEvent(*dev, ev);

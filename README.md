@@ -1,4 +1,4 @@
-# steam controller on android tv
+# steam controller bridge
 
 use a steam controller 2026 (valve, codename ibex) as a standard android gamepad, no root. usb otg or the wireless puck, or bluetooth le directly. the app parses the controller's proprietary hid protocol and exposes it as an xbox 360-compatible virtual gamepad; a desktop mode turns the same controller into a mouse and keyboard for android tv.
 
@@ -29,6 +29,8 @@ which one is in use is probed at runtime, and named on the status card together 
 - usb host (otg) support for the wired and puck paths
 - a steam controller 2026 (valve ibex). the older steam controller is not supported
 
+not affiliated with or endorsed by valve. steam and steam controller are trademarks of valve corporation.
+
 ## setup
 
 1. install shizuku and start it (adb wireless on android 11+, a one-time adb cable below that)
@@ -37,7 +39,17 @@ which one is in use is probed at runtime, and named on the status card together 
 4. usb: plug the puck or the controller into the otg port, android asks for usb permission. bluetooth: pair the controller via settings first, then pick it in the app's device dropdown, `↻` if you just paired it
 5. pick the emulated profile - xbox 360 is the safest default for games, desktop for mouse + keyboard
 6. hit **start service**. the card shows `Mode: <profile> (uinput) ✓` when it is up
-7. optional: tune calibration, mapping and rumble, save it as a game profile, bind it to an app so it auto-loads
+7. optional: tune calibration, mapping, gyro and rumble, save it as a game profile, bind it to an app so it auto-loads
+
+### the optional accessibility service
+
+shizuku's wireless-debugging start button cannot receive d-pad focus on android tv, so with only a remote there is no way to press it. the app ships an optional accessibility service, `Steam Controller Bridge - Shizuku starter`, that presses it for you:
+
+- it is off unless you turn it on under accessibility settings. the app only suggests it when you ask it to start shizuku and shizuku is not running
+- its config restricts it to shizuku's package (`moe.shizuku.privileged.api`); it sees no other app's windows
+- it stays inert until you ask the app to start shizuku, disarms after 45 seconds or once it has picked the adb port, and only ever clicks shizuku's start and port buttons
+
+on a phone or tablet, or if you start shizuku some other way, you never need it.
 
 everything is live: most changes apply within ~250 ms, without a restart. changing transport or profile restarts the service (or use the notification's profile cycle action).
 
@@ -76,7 +88,7 @@ for ble, the standard hid service (`0x1812`) is claimed by the os, so the app ta
 
 standard android gradle build. needs android studio hedgehog or newer, android gradle plugin 8.5+, kotlin 2.0+, and the ndk with cmake 3.22.1 for the native jni library.
 
-first time: open the project in android studio and let it sync - that regenerates the gradle wrapper. after that:
+the gradle wrapper is committed, so android studio or the command line both work:
 
 ```sh
 ./gradlew assembleDebug
@@ -97,7 +109,7 @@ live settings and game profiles live in `SharedPreferences`: transport and paire
 
 **controller went to sleep.** not a bug, it powers down when idle. the app keeps retrying with backoff and immediately on `ACTION_ACL_CONNECTED`, so pressing steam is enough.
 
-**everything is dead after a reboot.** shizuku does not survive a reboot on android 9 and cannot be restarted from the tv, so start it from a pc (a copy is pre-staged on the device):
+**everything is dead after a reboot.** shizuku does not survive a reboot on android 9 and cannot be restarted from the tv, so start it from a pc. copy shizuku's apk to `/data/local/tmp/shizuku.apk` once, then:
 
 ```sh
 adb shell 'nohup sh -c "CLASSPATH=/data/local/tmp/shizuku.apk app_process /system/bin \
@@ -111,8 +123,8 @@ the app picks up on its own afterwards. the card reports this state explicitly.
 **testing from a pc.** stop the service before `adb install` - a gatt client that dies without closing leaves the controller wedged until it is power-cycled or re-paired:
 
 ```sh
-adb shell run-as com.steamcontroller.android.debug am stop-service --user 0 \
-  -n com.steamcontroller.android.debug/com.steamcontroller.android.service.ControllerService
+adb shell run-as io.github.lluppi.steamcontrollerbridge.debug am stop-service --user 0 \
+  -n io.github.lluppi.steamcontrollerbridge.debug/com.steamcontroller.android.service.ControllerService
 ```
 
 debug builds install side by side with a release build (`applicationIdSuffix = ".debug"`), so testing never replaces a working install.
@@ -125,7 +137,7 @@ debug builds install side by side with a release build (`applicationIdSuffix = "
 | usb rumble | not implemented - the controller only vibrates over bluetooth |
 | left trackpad click | not reported anywhere in the controller's vendor report, so it cannot be mapped. the right pad clicks, the left pad scrolls |
 | trackpads | usable as a mouse, not yet exposed as a ds4/ds5 touchpad to games that support one natively |
-| gyroscope | the quaternion imu is parsed but routed nowhere. gyro aiming is planned |
+| gyroscope | gyro aiming is mixed into the right stick (tuned and bias-calibrated on the calibration screen). games never see a real motion sensor |
 | steam button | passes through as `KEYCODE_BUTTON_MODE`, android treats it as the system guide key and may open the launcher |
 | shizuku at reboot | must be restarted by the user after each reboot (android 9 limitation, not the app's) |
 | rumble byte format | empirically tuned from the linux `hid-steam` driver |
@@ -135,7 +147,7 @@ debug builds install side by side with a release build (`applicationIdSuffix = "
 
 - usb rumble
 - trackpad as a real touchpad input (ds4/ds5 profile)
-- gyro aiming for ds4 / ds5
+- gyro as a native motion sensor for ds4 / ds5
 - rumble without `uinput` (dualshock 4 emulation via `hid-sony`, present on the shield's kernel)
 - retroarch autoconfig profiles and back-paddle presets
 - hid debug log export ("log to file")

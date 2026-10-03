@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Steam Controller</string>
+    <string name="app_name">Steam Controller Bridge</string>
     <string name="status_disconnected">Disconnected</string>
     <string name="status_ready">Ready</string>
     <string name="status_link_lost">Link lost - %1$s</string>
@@ -13,13 +13,13 @@
 
     <string name="help_dialog_title">Switching connection modes</string>
     <string name="notification_channel_name">Controller Service</string>
-    <string name="notification_title">Steam Controller</string>
+    <string name="notification_title">Steam Controller Bridge</string>
     <string name="notif_mode_uinput">Emulating %1$s</string>
     <string name="notif_mode_inject">Fallback: Shizuku inject (limited)</string>
     <string name="notif_starting">Connecting…</string>
 
     <!-- ━━━━━━━━━━━━ MainActivity ━━━━━━━━━━━━ -->
-    <string name="main_title">Steam Controller</string>
+    <string name="main_title">Steam Controller Bridge</string>
     <string name="main_subtitle">for Android via Shizuku</string>
     <string name="main_subtitle_tv">for Android TV via Shizuku</string>
     <string name="main_open_github_desc">Open GitHub repository</string>
@@ -42,19 +42,19 @@
     <!-- ━━━━━━━━━━━━ Shizuku TV startup ━━━━━━━━━━━━ -->
     <string name="main_shizuku_open_failed">Could not open Shizuku.</string>
     <string name="main_shizuku_store_failed">Could not open a store. Install Shizuku manually from GitHub.</string>
-    <string name="shizuku_starter_service_label">Steam Controller - Shizuku starter</string>
+    <string name="shizuku_starter_service_label">Steam Controller Bridge - Shizuku starter</string>
     <string name="shizuku_starter_service_summary">Presses Shizuku\'s Start button so a TV remote is enough.</string>
     <string name="shizuku_starter_service_description">Shizuku\'s Start button cannot receive D-pad focus on Android TV. This helper sees only Shizuku and acts only briefly after you request it.</string>
     <string name="shizuku_starter_prompt_title">Let the app press Start for you</string>
-    <string name="shizuku_starter_prompt_message">Shizuku\'s Start button cannot be selected with a TV remote. Enable “Steam Controller - Shizuku starter” under Accessibility and this app will press it for you. It is restricted to Shizuku and only acts after you ask it to.</string>
+    <string name="shizuku_starter_prompt_message">Shizuku\'s Start button cannot be selected with a TV remote. Enable “Steam Controller Bridge - Shizuku starter” under Accessibility and this app will press it for you. It is restricted to Shizuku and only acts after you ask it to.</string>
     <string name="shizuku_starter_prompt_open_settings">Open Accessibility settings</string>
     <string name="shizuku_starter_prompt_open_shizuku">Just open Shizuku</string>
     <string name="shizuku_starter_armed">Opening Shizuku and pressing Start…</string>
     <string name="shizuku_starter_settings_failed">Could not open Accessibility settings.</string>
-    <string name="shizuku_starter_settings_path">Go to Device Preferences → Accessibility → Steam Controller - Shizuku starter</string>
+    <string name="shizuku_starter_settings_path">Go to Device Preferences → Accessibility → Steam Controller Bridge - Shizuku starter</string>
     <string name="autostart_channel_name">Controller auto-start</string>
     <string name="autostart_shizuku_advisory_title">Controller auto-start needs Shizuku</string>
-    <string name="autostart_shizuku_advisory_text">Start Shizuku, then open Steam Controller to restore controller input.</string>
+    <string name="autostart_shizuku_advisory_text">Start Shizuku, then open Steam Controller Bridge to restore controller input.</string>
 
     <!-- ━━━━━━━━━━━━ CalibrationActivity ━━━━━━━━━━━━ -->
     <string name="calib_title">Calibration</string>

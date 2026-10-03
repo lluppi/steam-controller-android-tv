@@ -48,6 +48,17 @@ inline const gamepad_profile PROFILES[] = {
     { 4, 0x046D, 0xC077, "Steam Controller Desktop", true },
 };
 
+// Sidecar device identities, shared by both backends so a profile looks the same to Android
+// whichever backend created it. Desktop has no gamepad, so its mouse takes the profile's own
+// identity (a real mouse) and the keyboard the next PID. Gamepad mode keeps the sidecars well
+// clear of the pad's PID so no gamepad keylayout ever matches them.
+inline uint16_t sidecar_mouse_pid(const gamepad_profile& p) {
+    return p.mouse_mode ? p.pid : (uint16_t)(p.pid + 0x100);
+}
+inline uint16_t sidecar_keyboard_pid(const gamepad_profile& p) {
+    return p.mouse_mode ? (uint16_t)(p.pid + 1) : (uint16_t)(p.pid + 0x200);
+}
+
 inline const gamepad_profile& find_profile(int id) {
     for (const auto& p : PROFILES) {
         if (p.id == id) return p;

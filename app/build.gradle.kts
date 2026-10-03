@@ -33,11 +33,11 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.steamcontroller.android"
+        applicationId = "io.github.lluppi.steamcontrollerbridge"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "2.1-shield"
+        versionCode = 1
+        versionName = "1.0.0"
 
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
