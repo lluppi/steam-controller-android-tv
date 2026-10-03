@@ -103,32 +103,6 @@ live settings and game profiles live in `SharedPreferences`: transport and paire
 
 `export backup` / `import backup` in the game profiles screen moves all of it to one json file - useful before uninstalling or when moving to a new device.
 
-## troubleshooting
-
-**nothing responds, but the os says the controller is bonded.** the controller wakes into the wireless mode it last used, so it is often hunting for a puck that is not there. check the led: hold `b + r1 + steam` until the chime, blue is bluetooth, white is a puck slot, green is wired. the status card doubles as a reconnect action and says the same thing.
-
-**controller went to sleep.** not a bug, it powers down when idle. the app keeps retrying with backoff and immediately on `ACTION_ACL_CONNECTED`, so pressing steam is enough.
-
-**everything is dead after a reboot.** shizuku does not survive a reboot on android 9 and cannot be restarted from the tv, so start it from a pc. copy shizuku's apk to `/data/local/tmp/shizuku.apk` once, then:
-
-```sh
-adb shell 'nohup sh -c "CLASSPATH=/data/local/tmp/shizuku.apk app_process /system/bin \
-  --nice-name=shizuku_server moe.shizuku.server.ShizukuService --debug=false" \
-  > /data/local/tmp/shizuku.out 2>&1 &'
-adb shell 'ps -A | grep shizuku_server'      # runs as shell
-```
-
-the app picks up on its own afterwards. the card reports this state explicitly.
-
-**testing from a pc.** stop the service before `adb install` - a gatt client that dies without closing leaves the controller wedged until it is power-cycled or re-paired:
-
-```sh
-adb shell run-as io.github.lluppi.steamcontrollerbridge.debug am stop-service --user 0 \
-  -n io.github.lluppi.steamcontrollerbridge.debug/com.steamcontroller.android.service.ControllerService
-```
-
-debug builds install side by side with a release build (`applicationIdSuffix = ".debug"`), so testing never replaces a working install.
-
 ## known limitations
 
 | limitation | detail |
