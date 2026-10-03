@@ -5,11 +5,9 @@ package com.steamcontroller.android.uinput;
 // Fronts the virtual-output backends: /dev/uinput when the shell UID is allowed to open
 // it, /dev/uhid otherwise. See cpp/output_backend.h.
 interface IUInputService {
-    // Probe the backends and adopt one. `preferred` is 0 = auto, 1 = uinput, 2 = uhid.
+    // Probe the backends and adopt the most capable usable one.
     // Returns the chosen backend id (0 = none usable, 1 = uinput, 2 = uhid).
-    int selectBackend(int preferred);
-
-    int getBackend();
+    int selectBackend();
 
     // Human-readable probe result for every backend, e.g.
     // "/dev/uinput: Permission denied, /dev/uhid: ok". Shown in the UI.

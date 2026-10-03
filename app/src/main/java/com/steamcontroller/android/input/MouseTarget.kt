@@ -3,50 +3,46 @@ package com.steamcontroller.android.input
 import com.steamcontroller.android.parser.Buttons
 
 /**
- * Targets available in Desktop / Mouse mode. The `bit` field MUST match the order
- * of the `MOUSE_KEYS` array in `uinput_jni.cpp`. Bits 15/16/17 are mouse buttons.
- *
- * NONE (bit = -1) means "no event emitted for this source".
+ * Bit positions in the sidecar `keys` mask sent to the native backends. The order MUST match
+ * `MouseKeyBit` / `SIDECAR_KEYS` in `cpp/hid_common.h`; bits 16-18 are the mouse buttons
+ * (`MK_BTN_*_BIT`). [XboxTarget.keyBit] refers to these, so this is the only Kotlin copy.
  */
 enum class MouseTarget(
     val bit: Int,
-    val displayName: String,
 ) {
-    NONE(-1, "(none)"),
-
     // Navigation keys
-    KEY_UP(0, "↑ Up"),
-    KEY_DOWN(1, "↓ Down"),
-    KEY_LEFT(2, "← Left"),
-    KEY_RIGHT(3, "→ Right"),
+    KEY_UP(0),
+    KEY_DOWN(1),
+    KEY_LEFT(2),
+    KEY_RIGHT(3),
 
-    KEY_ENTER(4, "Enter / OK"),
-    KEY_BACK(5, "Back (Android)"),
-    KEY_TAB(6, "Tab"),
-    KEY_SPACE(7, "Space"),
+    KEY_ENTER(4),
+    KEY_BACK(5),
+    KEY_TAB(6),
+    KEY_SPACE(7),
 
-    KEY_HOME(8, "Home"),
-    KEY_ESC(9, "Escape"),
+    KEY_HOME(8),
+    KEY_ESC(9),
 
-    KEY_VOLUME_UP(10, "Volume +"),
-    KEY_VOLUME_DOWN(11, "Volume -"),
-    KEY_PLAY_PAUSE(12, "Play/Pause"),
-    KEY_MENU(13, "Menu (context)"),
-    KEY_BACKSPACE(14, "Backspace"),
+    KEY_VOLUME_UP(10),
+    KEY_VOLUME_DOWN(11),
+    KEY_PLAY_PAUSE(12),
+    KEY_MENU(13),
+    KEY_BACKSPACE(14),
 
     // bit 15 → Linux KEY_SELECT → AKEYCODE_DPAD_CENTER. Required to "click" a
     // focused key on the Android TV Leanback soft keyboard (ENTER alone is not
     // enough - the IME source-filters selection to DPAD_CENTER events).
-    KEY_DPAD_CENTER(15, "DPAD Center / select"),
+    KEY_DPAD_CENTER(15),
 
     // Mouse buttons (bits 16-18 in the native frame)
-    BTN_LEFT(16, "🖱 Left click"),
-    BTN_RIGHT(17, "🖱 Right click"),
-    BTN_MIDDLE(18, "🖱 Middle click"),
+    BTN_LEFT(16),
+    BTN_RIGHT(17),
+    BTN_MIDDLE(18),
 }
 
 /**
- * Source bits that route to *fixed* targets in mouse mode (not customisable in V1.1):
+ * Source bits that route to *fixed* targets in mouse mode (not customisable):
  *  - DPAD → arrow keys
  *  - Left trackpad click → right mouse click
  *  - Right trackpad motion → cursor delta (handled separately, not a button)

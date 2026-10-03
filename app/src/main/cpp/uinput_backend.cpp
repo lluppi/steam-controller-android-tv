@@ -1,4 +1,4 @@
-// /dev/uinput backend — upstream's implementation, behaviour unchanged.
+// /dev/uinput backend — upstream's implementation, moved behind the backend seam.
 //
 // One evdev device per virtual device. Needs the calling process (the Shizuku user
 // service, running as the shell UID) to be allowed to open /dev/uinput. On some
@@ -28,20 +28,11 @@ public:
     const char* probeDetail() const override { return detail_; }
 
     bool probe() override {
-        const int fd = ::open(UINPUT_PATH, O_WRONLY | O_NONBLOCK | O_CLOEXEC);
-        if (fd < 0) {
-            snprintf(detail_, sizeof(detail_), "%s", strerror(errno));
-            return false;
-        }
-        ::close(fd);
-        snprintf(detail_, sizeof(detail_), "ok");
-        return true;
+        return probe_node(UINPUT_PATH, O_WRONLY | O_NONBLOCK, detail_, sizeof(detail_));
     }
 
     bool createDevices(int profileId) override {
-        const gamepad_profile& prof = find_profile(profileId);
-        LOGI("createDevices: profile=%d (VID=0x%04X PID=0x%04X name=\"%s\")",
-             prof.id, prof.vid, prof.pid, prof.name);
+        const gamepad_profile& prof = find_and_log_profile(profileId);
 
         destroyDevices();
 
@@ -358,7 +349,7 @@ private:
                      && set_bit(fd, UI_SET_KEYBIT, BTN_LEFT)
                      && set_bit(fd, UI_SET_KEYBIT, BTN_RIGHT)
                      && set_bit(fd, UI_SET_KEYBIT, BTN_MIDDLE);
-        if (!ok || finalize_device(fd, vid, pid, "Steam Controller Mouse", 0) < 0) {
+        if (!ok || finalize_device(fd, vid, pid, SIDECAR_MOUSE_NAME, 0) < 0) {
             close(fd);
             return -1;
         }
@@ -413,7 +404,7 @@ private:
         }
 
         // PID +1 keeps a stable, distinct identity vs the mouse half.
-        if (!ok || finalize_device(fd, vid, pid, "Steam Controller Keyboard", 0) < 0) {
+        if (!ok || finalize_device(fd, vid, pid, SIDECAR_KEYBOARD_NAME, 0) < 0) {
             close(fd);
             return -1;
         }

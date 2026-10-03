@@ -74,13 +74,9 @@ class HidReportReader(
                                 )
                             }
 
-                            len == 0 -> {
-                                yield()
-                            }
-
                             else -> {
                                 yield()
-                            } // -1 = timeout, normal
+                            } // 0 = empty read, -1 = timeout: both normal
                         }
                     }
                 }

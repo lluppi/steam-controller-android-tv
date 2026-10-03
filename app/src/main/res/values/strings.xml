@@ -21,7 +21,6 @@
     <!-- ━━━━━━━━━━━━ MainActivity ━━━━━━━━━━━━ -->
     <string name="main_title">Steam Controller Bridge</string>
     <string name="main_subtitle">for Android via Shizuku</string>
-    <string name="main_subtitle_tv">for Android TV via Shizuku</string>
     <string name="main_open_github_desc">Open GitHub repository</string>
     <string name="main_help_desc">Help: switching connection modes</string>
     <string name="main_shizuku_checking">Shizuku: checking…</string>
@@ -60,15 +59,10 @@
     <string name="calib_title">Calibration</string>
     <string name="calib_sticks_header">STICKS</string>
     <string name="calib_deadzone_label">Deadzone</string>
-    <string name="calib_deadzone_lr_label">Deadzone L / R</string>
     <string name="calib_invert_y">Invert Y</string>
-    <string name="calib_invert_l_y">Invert L Y</string>
-    <string name="calib_invert_r_y">Invert R Y</string>
     <string name="calib_calibrate_all">Calibrate All</string>
-    <string name="calib_calibrate_hint">Leave both sticks centered, then tap</string>
     <string name="calib_rumble_header">RUMBLE</string>
     <string name="calib_test_intensity">Test intensity</string>
-    <string name="calib_intensity">Intensity</string>
     <string name="calib_test_rumble">Test rumble</string>
     <string name="calib_rumble_unsupported">Test haptics (game rumble unavailable)</string>
     <string name="calib_gyro_header">GYRO AIMING</string>
@@ -86,7 +80,6 @@
     <string name="calib_desktop_header">DESKTOP MODE</string>
     <string name="calib_mouse_sensitivity">Mouse sensitivity</string>
     <string name="calib_trackpad_switch_label">Trackpads as mouse in gamepad mode</string>
-    <string name="calib_trackpad_switch_label_tv">Trackpads as mouse (gamepad)</string>
     <string name="calib_trackpad_hint">When ON, the right trackpad drives a cursor and the left one scrolls - alongside the gamepad.</string>
     <string name="calib_start_on_boot">Start service after device boot</string>
     <string name="calib_start_on_connect">Start when controller connects</string>
@@ -100,20 +93,13 @@
     <string name="debug_face_buttons">FACE BUTTONS</string>
     <string name="debug_dpad">D-PAD</string>
     <string name="debug_bumpers_system">BUMPERS / SYSTEM</string>
-    <string name="debug_sticks_pads">STICKS / PADS (clicks)</string>
     <string name="debug_sticks_pads_compact">STICKS / PADS</string>
     <string name="debug_grips_back">GRIPS / BACK</string>
     <string name="debug_triggers_header">TRIGGERS (0-255)</string>
     <string name="debug_lt">LT</string>
     <string name="debug_rt">RT</string>
-    <string name="debug_sticks_header">STICKS (raw ±32767)</string>
     <string name="debug_left_stick">LEFT STICK</string>
     <string name="debug_right_stick">RIGHT STICK</string>
-    <string name="debug_left_x">Left X</string>
-    <string name="debug_left_y">Left Y</string>
-    <string name="debug_right_x">Right X</string>
-    <string name="debug_right_y">Right Y</string>
-    <string name="debug_trackpads_header">TRACKPADS (raw ±32767)</string>
     <string name="debug_left_trackpad">LEFT TRACKPAD</string>
     <string name="debug_right_trackpad">RIGHT TRACKPAD</string>
     <string name="debug_imu_quaternion">IMU QUATERNION</string>
@@ -125,9 +111,7 @@
     <string name="debug_btn_lb">LB</string>
     <string name="debug_btn_rb">RB</string>
     <string name="debug_btn_select">SEL</string>
-    <string name="debug_btn_steam_glyph">◆</string>
     <string name="debug_btn_steam_alt_glyph">☰</string>
-    <string name="debug_btn_start_glyph">≡</string>
     <string name="debug_btn_start_text">START</string>
     <string name="debug_btn_qa">QA</string>
     <string name="debug_dpad_up">▲</string>

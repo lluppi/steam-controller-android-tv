@@ -16,14 +16,6 @@ enum BackendId {
     BACKEND_UHID   = 2,
 };
 
-// What the user asked for (AIDL `selectBackend` argument). AUTO takes the most
-// capable backend the device actually allows, in candidate order.
-enum BackendPref {
-    PREF_AUTO   = 0,
-    PREF_UINPUT = 1,
-    PREF_UHID   = 2,
-};
-
 class OutputBackend {
 public:
     virtual ~OutputBackend() = default;

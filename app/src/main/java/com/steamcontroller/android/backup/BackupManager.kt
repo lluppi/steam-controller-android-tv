@@ -30,7 +30,6 @@ object BackupManager {
 
         val live = JSONObject().apply {
             put("gamepadProfileId", Prefs.getProfile(context).id)
-            put("lastGamepadProfileId", Prefs.getLastGamepadProfile(context).id)
             put("leftCal", calToJson(leftCal))
             put("rightCal", calToJson(rightCal))
             put("rumbleIntensity", Prefs.getRumbleIntensity(context))

@@ -20,12 +20,14 @@ package com.steamcontroller.android.uinput
 enum class GamepadProfile(
     val id: Int,
     val displayName: String,
-    val vid: Int,
-    val pid: Int,
     val isMouseMode: Boolean = false
 ) {
-    XBOX_360(0, "Xbox 360 Controller", 0x045E, 0x028E),
-    MOUSE(4, "Desktop (mouse + keyboard)", 0x046D, 0xC077, isMouseMode = true);
+    // VID/PID live with the native PROFILES table (cpp/hid_common.h), keyed by `id`.
+    XBOX_360(0, "Xbox 360 Controller"),
+    MOUSE(4, "Desktop (mouse + keyboard)", isMouseMode = true);
+
+    /** The profile after this one, wrapping - what the notification's cycle action switches to. */
+    fun next(): GamepadProfile = values()[(ordinal + 1) % values().size]
 
     companion object {
         fun fromId(id: Int): GamepadProfile = values().firstOrNull { it.id == id } ?: XBOX_360

@@ -11,7 +11,7 @@ import org.json.JSONObject
  * matching live preference keys (profileId, transport, sticks, mappings, etc.) so the
  * very next service start uses the profile's settings.
  *
- * `boundPackages` powers the foreground-app auto-switch in Phase 2b: if the currently
+ * `boundPackages` powers the foreground-app auto-switch: if the currently
  * focused Android app matches any package in this profile's list, the service swaps in.
  */
 data class NamedProfile(

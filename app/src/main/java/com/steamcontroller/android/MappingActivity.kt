@@ -15,7 +15,7 @@ import com.steamcontroller.android.input.SteamButton
 import com.steamcontroller.android.input.XboxTarget
 
 /**
- * V1.2 - each row shows a Kenney input-prompts icon when one exists, falling back
+ * Each row shows a Kenney input-prompts icon when one exists, falling back
  * to a colored letter chip otherwise. Source uses the white SC icon; target uses
  * the official Steam Controller colored A/B/X/Y or a neutral letter for everything
  * else. The entire row is clickable and opens a single-choice remap dialog.
@@ -114,15 +114,30 @@ class MappingActivity : AppCompatActivity() {
     }
 
     private fun applySourceChip(icon: ImageView, badge: TextView, source: SteamButton) {
-        val iconRes = sourceIconFor(source)
+        showIconOrBadge(
+            icon,
+            badge,
+            sourceIconFor(source),
+            source.shortLabel,
+            ContextCompat.getColor(this, R.color.btn_neutral),
+        )
+    }
+
+    /** A chip shows the button's glyph when there is one, otherwise a coloured text badge. */
+    private fun showIconOrBadge(
+        icon: ImageView,
+        badge: TextView,
+        iconRes: Int?,
+        badgeText: String,
+        badgeColor: Int,
+    ) {
         if (iconRes != null) {
             icon.setImageResource(iconRes)
             icon.visibility = View.VISIBLE
             badge.visibility = View.GONE
         } else {
-            badge.text = source.shortLabel
-            badge.backgroundTintList =
-                ColorStateList.valueOf(ContextCompat.getColor(this, R.color.btn_neutral))
+            badge.text = badgeText
+            badge.backgroundTintList = ColorStateList.valueOf(badgeColor)
             badge.visibility = View.VISIBLE
             icon.visibility = View.GONE
         }
@@ -134,17 +149,7 @@ class MappingActivity : AppCompatActivity() {
         label: TextView,
         target: XboxTarget
     ) {
-        val iconRes = targetIconFor(target)
-        if (iconRes != null) {
-            icon.setImageResource(iconRes)
-            icon.visibility = View.VISIBLE
-            badge.visibility = View.GONE
-        } else {
-            badge.text = shortLabelFor(target)
-            badge.backgroundTintList = ColorStateList.valueOf(colorFor(target))
-            badge.visibility = View.VISIBLE
-            icon.visibility = View.GONE
-        }
+        showIconOrBadge(icon, badge, targetIconFor(target), shortLabelFor(target), colorFor(target))
         label.text = target.displayName
     }
 

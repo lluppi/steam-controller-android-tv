@@ -15,9 +15,14 @@
 #pragma once
 
 #include <android/log.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <linux/input.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #ifndef LOG_TAG
 #define LOG_TAG "virtual_input"
@@ -64,6 +69,30 @@ inline const gamepad_profile& find_profile(int id) {
         if (p.id == id) return p;
     }
     return PROFILES[0];  // fallback: Xbox 360
+}
+
+// Looks up `profileId` and logs it - the first step of every backend's createDevices().
+inline const gamepad_profile& find_and_log_profile(int profileId) {
+    const gamepad_profile& prof = find_profile(profileId);
+    LOGI("createDevices: profile=%d (VID=0x%04X PID=0x%04X name=\"%s\")",
+         prof.id, prof.vid, prof.pid, prof.name);
+    return prof;
+}
+
+inline constexpr const char* SIDECAR_MOUSE_NAME = "Steam Controller Mouse";
+inline constexpr const char* SIDECAR_KEYBOARD_NAME = "Steam Controller Keyboard";
+
+// Backend probe: can `path` be opened with `flags` right now? Writes "ok" or the errno
+// text to `detail` for the UI and never leaves anything open.
+inline bool probe_node(const char* path, int flags, char* detail, size_t detail_size) {
+    const int fd = ::open(path, flags | O_CLOEXEC);
+    if (fd < 0) {
+        snprintf(detail, detail_size, "%s", strerror(errno));
+        return false;
+    }
+    ::close(fd);
+    snprintf(detail, detail_size, "ok");
+    return true;
 }
 
 // Both backends destroy and recreate devices on every profile switch. Give the

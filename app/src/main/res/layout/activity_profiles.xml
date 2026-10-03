@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  ProfilesActivity (phone) - Phase 2 of V1.2.
+  ProfilesActivity.
   Lists every saved NamedProfile. Tap "Load" to apply, overflow menu for rename / duplicate
   / delete / bind apps. Bottom FAB captures current live settings into a new profile.
 -->

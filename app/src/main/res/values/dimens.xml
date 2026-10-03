@@ -19,7 +19,6 @@
     <dimen name="title_size">28sp</dimen>
     <dimen name="subtitle_size">13sp</dimen>
     <dimen name="title_row_gap">8dp</dimen>
-    <dimen name="title_actions_gap">10dp</dimen>
 
     <!-- ── Rhythm ──────────────────────────────────────────────────────────────── -->
     <dimen name="block_gap">14dp</dimen>
@@ -41,7 +40,6 @@
     <dimen name="icon_button_gap">8dp</dimen>
 
     <!-- ── Hero card (controller illustration) ─────────────────────────────────── -->
-    <dimen name="hero_radius">22dp</dimen>
     <dimen name="hero_pad">18dp</dimen>
     <dimen name="hero_status_size">20sp</dimen>
     <dimen name="hero_meta_size">12sp</dimen>

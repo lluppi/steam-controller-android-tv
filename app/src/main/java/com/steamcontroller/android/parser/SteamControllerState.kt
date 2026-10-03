@@ -13,11 +13,11 @@ data class SteamControllerState(
 
     val leftPadX: Short = 0, // bytes 18-19
     val leftPadY: Short = 0, // bytes 20-21
-    val leftPadContact: Int = 0, // bytes 22-23
+    // bytes 22-23: left pad contact pressure (not used)
 
     val rightPadX: Short = 0, // bytes 24-25
     val rightPadY: Short = 0, // bytes 26-27
-    val rightPadContact: Int = 0, // bytes 28-29
+    // bytes 28-29: right pad contact pressure (not used)
 
     val quatW: Short = 0, // bytes 32-33  IMU quaternion
     val quatX: Short = 0, // bytes 34-35

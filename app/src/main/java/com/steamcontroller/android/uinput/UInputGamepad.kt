@@ -168,9 +168,9 @@ class UInputGamepad(
             ).daemon(false)
             .processNameSuffix("uinput")
             .debuggable(false)
-            // Bumped from 1: a stale user-service process would be running the previous AIDL
-            // (canCreateDevice) and silently fail every call below.
-            .version(2)
+            // Bump whenever IUInputService changes: a stale user-service process would still be
+            // running the previous AIDL and silently fail or misroute every call below.
+            .version(3)
 
     @Volatile private var deviceReady = false
 
@@ -186,7 +186,7 @@ class UInputGamepad(
                 // Binder calls can block - do them off the main thread
                 Thread {
                     try {
-                        val backend = svc.selectBackend(Prefs.getBackendPref(context))
+                        val backend = svc.selectBackend()
                         backendId = backend
                         backendDetail = svc.getBackendDetail() ?: ""
                         rumbleSupported = svc.supportsRumble()
@@ -446,9 +446,8 @@ class UInputGamepad(
                     rtOverride = 255
                 }
 
-                target.mask < 0 && target.keyBit < 0 && target.triggerSide == 0 -> {
-                    val wasPressed = lastSourceButtons and sourceBit != 0L
-                    if (pressed && !wasPressed) handleSpecialAction(target)
+                target.isSpecialAction -> {
+                    fireSpecialActionOnPress(target, sourceBit, sourceButtons)
                 }
             }
         }
@@ -646,7 +645,17 @@ class UInputGamepad(
         return relX to relY
     }
 
-    /** Left trackpad vertical → wheel ticks. One tick per ~1000 accumulator units. */
+    /** Special actions are edge-triggered: they fire once, on the frame the source goes down. */
+    private fun fireSpecialActionOnPress(
+        target: XboxTarget,
+        sourceBit: Long,
+        sourceButtons: Long,
+    ) {
+        val pressed = sourceButtons and sourceBit != 0L
+        val wasPressed = lastSourceButtons and sourceBit != 0L
+        if (pressed && !wasPressed) handleSpecialAction(target)
+    }
+
     private fun sourceButtons(state: SteamControllerState): Long {
         val now = android.os.SystemClock.uptimeMillis()
         var pressed = 0L
@@ -662,6 +671,7 @@ class UInputGamepad(
         return pressed
     }
 
+    /** Left trackpad vertical → wheel ticks. One tick per ~1000 accumulator units. */
     private fun computeLeftPadScroll(state: SteamControllerState): Int {
         val touching = state.isButtonPressed(Buttons.TP_LT)
         val curY = state.leftPadY.toInt()
@@ -725,11 +735,8 @@ class UInputGamepad(
         // Special actions (screenshot) still honoured via the gamepad mapping table -
         // keeps QA → screenshot working even in mouse mode.
         for ((source, target) in cachedDesktopMapping) {
-            if (target.mask < 0 && target.keyBit < 0 && target.triggerSide == 0) {
-                val sourceBit = 1L shl source.ordinal
-                val pressed = sourceButtons and sourceBit != 0L
-                val wasPressed = lastSourceButtons and sourceBit != 0L
-                if (pressed && !wasPressed) handleSpecialAction(target)
+            if (target.isSpecialAction) {
+                fireSpecialActionOnPress(target, 1L shl source.ordinal, sourceButtons)
             }
         }
         lastSourceButtons = sourceButtons

@@ -11,7 +11,6 @@ import com.steamcontroller.android.input.SteamButton
 import com.steamcontroller.android.input.StickCalibration
 import com.steamcontroller.android.input.XboxTarget
 import com.steamcontroller.android.uinput.GamepadProfile
-import com.steamcontroller.android.uinput.UInputNative
 
 enum class Transport(
     val id: Int,
@@ -57,7 +56,6 @@ object Prefs {
     private const val KEY_ACTIVE_NAMED_PROFILE_ID = "active_named_profile_id"
 
     private const val KEY_SAVED_SHOW_IME_HARD_KB = "saved_show_ime_with_hard_keyboard"
-    private const val KEY_BACKEND_PREF = "output_backend_pref"
     private const val KEY_START_ON_BOOT = "start_on_boot"
     private const val KEY_START_ON_CONNECT = "start_on_controller_connect"
     private const val KEY_USER_STOPPED_SERVICE = "user_stopped_service"
@@ -95,7 +93,7 @@ object Prefs {
         copyBoolean("autostart_on_controller_connect", KEY_START_ON_CONNECT)
 
         SteamButton.values().forEach { source ->
-            val key = mapKey(source)
+            val key = mapKey(MAP_PREFIX, source)
             val value = stored[key]
             if (value is Number) {
                 XboxTarget.fromPersisted(value)?.let { edit.putString(key, it.name) }
@@ -128,11 +126,6 @@ object Prefs {
         val p = GamepadProfile.fromId(id)
         return if (p.isMouseMode) GamepadProfile.XBOX_360 else p
     }
-
-    // ─── Output backend ──────────────────────────────────────────────────────
-
-    /** Preferred output backend - see UInputNative.Pref. AUTO lets the service pick. */
-    fun getBackendPref(context: Context): Int = prefs(context).getInt(KEY_BACKEND_PREF, UInputNative.Pref.AUTO)
 
     // ─── Start on boot ───────────────────────────────────────────────────────
 
@@ -387,16 +380,21 @@ object Prefs {
     }
 
     // ─── Button mapping ──────────────────────────────────────────────────────
-    private fun mapKey(source: SteamButton) = "map_${source.name}"
+    // Gamepad and desktop mappings are the same table under different key prefixes.
+    private const val MAP_PREFIX = "map_"
+    private const val DESKTOP_MAP_PREFIX = "desktop_map_"
 
-    private fun desktopMapKey(source: SteamButton) = "desktop_map_${source.name}"
+    private fun mapKey(prefix: String, source: SteamButton) = "$prefix${source.name}"
 
-    fun getMapping(
+    /** Reads a stored target, rewriting a legacy/unknown stored value to the canonical name. */
+    private fun readMapping(
         context: Context,
+        prefix: String,
+        defaults: Map<SteamButton, XboxTarget>,
         source: SteamButton,
     ): XboxTarget {
-        val key = mapKey(source)
-        val default = DEFAULT_MAPPING[source] ?: XboxTarget.NONE
+        val key = mapKey(prefix, source)
+        val default = defaults[source] ?: XboxTarget.NONE
         val stored = prefs(context).all[key]
         val target = XboxTarget.fromPersisted(stored) ?: default
         if (stored != null && stored != target.name) {
@@ -405,51 +403,55 @@ object Prefs {
         return target
     }
 
+    private fun writeMapping(
+        context: Context,
+        prefix: String,
+        source: SteamButton,
+        target: XboxTarget,
+    ) {
+        prefs(context).edit().putString(mapKey(prefix, source), target.name).apply()
+    }
+
+    private fun clearMappings(
+        context: Context,
+        prefix: String,
+    ) {
+        val edit = prefs(context).edit()
+        SteamButton.values().forEach { edit.remove(mapKey(prefix, it)) }
+        edit.apply()
+    }
+
+    fun getMapping(
+        context: Context,
+        source: SteamButton,
+    ): XboxTarget = readMapping(context, MAP_PREFIX, DEFAULT_MAPPING, source)
+
     fun setMapping(
         context: Context,
         source: SteamButton,
         target: XboxTarget,
-    ) {
-        prefs(context).edit().putString(mapKey(source), target.name).apply()
-    }
+    ) = writeMapping(context, MAP_PREFIX, source, target)
 
     fun getAllMappings(context: Context): Map<SteamButton, XboxTarget> =
-        SteamButton.values().associateWith {
-            getMapping(context, it)
-        }
+        SteamButton.values().associateWith { getMapping(context, it) }
 
-    fun resetMappings(context: Context) {
-        val edit = prefs(context).edit()
-        SteamButton.values().forEach { edit.remove(mapKey(it)) }
-        edit.apply()
-    }
+    fun resetMappings(context: Context) = clearMappings(context, MAP_PREFIX)
 
     fun getDesktopMapping(
         context: Context,
         source: SteamButton,
-    ): XboxTarget {
-        val key = desktopMapKey(source)
-        val default = DEFAULT_DESKTOP_MAPPING[source] ?: XboxTarget.NONE
-        val stored = prefs(context).all[key]
-        return XboxTarget.fromPersisted(stored) ?: default
-    }
+    ): XboxTarget = readMapping(context, DESKTOP_MAP_PREFIX, DEFAULT_DESKTOP_MAPPING, source)
 
     fun setDesktopMapping(
         context: Context,
         source: SteamButton,
         target: XboxTarget,
-    ) {
-        prefs(context).edit().putString(desktopMapKey(source), target.name).apply()
-    }
+    ) = writeMapping(context, DESKTOP_MAP_PREFIX, source, target)
 
     fun getAllDesktopMappings(context: Context): Map<SteamButton, XboxTarget> =
         SteamButton.values().associateWith { getDesktopMapping(context, it) }
 
-    fun resetDesktopMappings(context: Context) {
-        val edit = prefs(context).edit()
-        SteamButton.values().forEach { edit.remove(desktopMapKey(it)) }
-        edit.apply()
-    }
+    fun resetDesktopMappings(context: Context) = clearMappings(context, DESKTOP_MAP_PREFIX)
 
     // ─── Named profiles ──────────────────────────────────────────────────────
     // Profiles are stored as a single JSON array under KEY_NAMED_PROFILES.

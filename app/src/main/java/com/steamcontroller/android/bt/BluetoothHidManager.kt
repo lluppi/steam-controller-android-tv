@@ -139,12 +139,16 @@ class BluetoothHidManager(private val context: Context) {
         val message = "connecting GATT to ${safeName(device)} (${device.address})"
         Log.i(TAG, message)
         Diagnostics.record(TAG, message)
+        openGatt(device, "connect")
+    }
+
+    private fun openGatt(device: BluetoothDevice, step: String) {
         state = State.CONNECTING
         // A previous client's claim may still be registered with the stack (e.g. the app was
         // killed mid-session), which makes the new connect fail with 133. Release it first.
         closeGatt()
         gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
-        armWatchdog("connect")
+        armWatchdog(step)
     }
 
     /** Immediately rebuild only the GATT link, preserving the virtual input devices. */
@@ -185,10 +189,7 @@ class BluetoothHidManager(private val context: Context) {
         }
         reconnectAttempts++
         Log.i(TAG, "Reconnect attempt $reconnectAttempts ($reason) → ${safeName(device)}")
-        state = State.CONNECTING
-        closeGatt()
-        gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
-        armWatchdog("reconnect")
+        openGatt(device, "reconnect")
     }
 
     /** Close the current client without touching the retry loop. */
@@ -276,20 +277,6 @@ class BluetoothHidManager(private val context: Context) {
             }
             scheduleReconnect("handshake timeout")
         }
-
-    /**
-     * Recreate the bond as a last resort.
-     *
-     * A GATT session lives in the system Bluetooth process, not in the app, so a client that dies
-     * mid-session leaves the peripheral believing it is still connected: the next client connects
-     * at the link layer and then every GATT operation stalls. Closing our own client and refreshing
-     * the cached database cannot clear that - only dropping the bond does, which is exactly the
-     * unpair/re-pair ritual. Doing it here means a wedged controller can recover on its own.
-     *
-     * Re-pairing is safe to attempt without user interaction for these controllers, and the address
-     * change that follows is handled by resolveTarget(). Escalation is capped by a cooldown so a
-     * persistently failing link cannot loop on it.
-     */
 
     /**
      * Reports a handshake that keeps failing.
@@ -411,16 +398,21 @@ class BluetoothHidManager(private val context: Context) {
         } catch (t: Throwable) {
             Log.w(TAG, "disconnect: ${t.message}")
         } finally {
-            gatt = null
-            featureWriteChar = null
-            batteryChar = null
-            stopBatteryPolling()
-            pendingSubs.clear()
-            subsIndex = 0
-            subscriptionBusyRetries = 0
-            state = State.IDLE
+            resetHandshake()
             onConnectionChange?.invoke(false)
         }
+    }
+
+    /** Forget the current GATT session and everything the handshake had built on it. */
+    private fun resetHandshake() {
+        gatt = null
+        featureWriteChar = null
+        batteryChar = null
+        stopBatteryPolling()
+        pendingSubs.clear()
+        subsIndex = 0
+        subscriptionBusyRetries = 0
+        state = State.IDLE
     }
 
     /**
@@ -536,13 +528,7 @@ class BluetoothHidManager(private val context: Context) {
                     try {
                         g.close()
                     } catch (_: Throwable) {}
-                    gatt = null
-                    featureWriteChar = null
-                    stopBatteryPolling()
-                    pendingSubs.clear()
-                    subsIndex = 0
-                    subscriptionBusyRetries = 0
-                    state = State.IDLE
+                    resetHandshake()
                     clearWatchdog()
                     scheduleReconnect("disconnected status=$status")
                 }

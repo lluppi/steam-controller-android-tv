@@ -325,7 +325,7 @@ class ControllerService : Service() {
             )
     }
 
-    // ─── Foreground-app auto-switch (V1.2 Phase 2b) ────────────────────────────
+    // ─── Foreground-app auto-switch ─────────────────────────────────────────────
     private var foregroundAppMonitorJob: Job? = null
     private var lastForegroundPackage: String? = null
 
@@ -733,9 +733,8 @@ class ControllerService : Service() {
     ) {
         _rawReportFlow.value = raw
 
-        val reportId = raw.firstOrNull()?.toInt()?.and(0xFF)
-        val isStateReport = reportId == 0x42 || reportId == 0x45
-        if (isStateReport && state != null) {
+        // The parser returns null for anything that is not a 0x42/0x45 state report.
+        if (state != null) {
             _stateFlow.value = state
 
             // Frames are the proof of life. Flip to LINKED immediately rather than waiting for
@@ -967,11 +966,8 @@ class ControllerService : Service() {
         }
         profileSwitchInFlight = true
 
-        val profiles =
-            com.steamcontroller.android.uinput.GamepadProfile
-                .values()
         val current = Prefs.getProfile(this)
-        val next = profiles[(current.ordinal + 1) % profiles.size]
+        val next = current.next()
         Prefs.setProfile(this, next)
         Log.i(TAG, "Cycle profile: ${current.displayName} → ${next.displayName}")
 
@@ -1040,33 +1036,23 @@ class ControllerService : Service() {
             buttonsConfirmedThisFrame = false
         }
 
-        when (mode) {
-            InjectionMode.UINPUT,
-            InjectionMode.UHID,
-            -> {
-                Unit
+        // Only the input-injection fallback is left at this point (re-read: mode can change
+        // from another thread mid-frame).
+        if (mode != InjectionMode.SHIZUKU_INJECT) return
+
+        // Axes every frame for smoothness, with live-reloaded calibration
+        legacyInjector.injectMotion(
+            GamepadMapper.axes(
+                state,
+                Prefs.getLeftCalibration(this),
+                Prefs.getRightCalibration(this),
+            ),
+        )
+        // Buttons only on debounced change
+        if (buttonsConfirmedThisFrame) {
+            GamepadMapper.buttons(state, previousConfirmed).forEach { (keyCode, down) ->
+                legacyInjector.injectKey(keyCode, down)
             }
-
-            // handled above
-
-            InjectionMode.SHIZUKU_INJECT -> {
-                // Axes every frame for smoothness, with live-reloaded calibration
-                legacyInjector.injectMotion(
-                    GamepadMapper.axes(
-                        state,
-                        Prefs.getLeftCalibration(this),
-                        Prefs.getRightCalibration(this),
-                    ),
-                )
-                // Buttons only on debounced change
-                if (buttonsConfirmedThisFrame) {
-                    GamepadMapper.buttons(state, previousConfirmed).forEach { (keyCode, down) ->
-                        legacyInjector.injectKey(keyCode, down)
-                    }
-                }
-            }
-
-            InjectionMode.NONE -> { /* unreachable */ }
         }
     }
 
@@ -1210,11 +1196,7 @@ class ControllerService : Service() {
             )
         val nextLabel =
             if (mode.isVirtualDevice) {
-                val profiles =
-                    com.steamcontroller.android.uinput.GamepadProfile
-                        .values()
-                val next = profiles[(profile.ordinal + 1) % profiles.size]
-                "→ ${next.displayName}"
+                "→ ${profile.next().displayName}"
             } else {
                 "Switch profile"
             }

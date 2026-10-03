@@ -148,24 +148,37 @@ class ProfilesActivity : AppCompatActivity() {
     }
 
     private fun promptSaveCurrent() {
+        promptForName(
+            title = "Save current settings as game profile",
+            initial = suggestNextName(),
+            hint = "Game profile name",
+            fallback = ::suggestNextName,
+        ) { name ->
+            val newProfile = Prefs.captureCurrentAsProfile(this, name)
+            Prefs.saveNamedProfile(this, newProfile)
+            Prefs.setActiveNamedProfileId(this, newProfile.id)
+        }
+    }
+
+    /** Single-field name dialog; a blank entry falls back to [fallback]. */
+    private fun promptForName(
+        title: String,
+        initial: String,
+        hint: String?,
+        fallback: () -> String,
+        onSave: (String) -> Unit,
+    ) {
         val input =
             EditText(this).apply {
-                hint = "Game profile name"
-                setText(suggestNextName())
+                this.hint = hint
+                setText(initial)
                 setSelection(text.length)
             }
         MaterialAlertDialogBuilder(this)
-            .setTitle("Save current settings as game profile")
+            .setTitle(title)
             .setView(input)
             .setPositiveButton("Save") { d, _ ->
-                val name =
-                    input.text
-                        .toString()
-                        .trim()
-                        .ifEmpty { suggestNextName() }
-                val newProfile = Prefs.captureCurrentAsProfile(this, name)
-                Prefs.saveNamedProfile(this, newProfile)
-                Prefs.setActiveNamedProfileId(this, newProfile.id)
+                onSave(input.text.toString().trim().ifEmpty { fallback() })
                 renderList()
                 d.dismiss()
             }.setNegativeButton(android.R.string.cancel, null)
@@ -190,26 +203,12 @@ class ProfilesActivity : AppCompatActivity() {
     }
 
     private fun promptRename(profile: NamedProfile) {
-        val input =
-            EditText(this).apply {
-                setText(profile.name)
-                setSelection(text.length)
-            }
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Rename profile")
-            .setView(input)
-            .setPositiveButton("Save") { d, _ ->
-                val newName =
-                    input.text
-                        .toString()
-                        .trim()
-                        .ifEmpty { profile.name }
-                Prefs.saveNamedProfile(this, profile.copy(name = newName))
-                renderList()
-                d.dismiss()
-            }.setNegativeButton(android.R.string.cancel, null)
-            .show()
-        showKeyboardFor(input)
+        promptForName(
+            title = "Rename profile",
+            initial = profile.name,
+            hint = null,
+            fallback = { profile.name },
+        ) { newName -> Prefs.saveNamedProfile(this, profile.copy(name = newName)) }
     }
 
     private fun duplicateProfile(profile: NamedProfile) {

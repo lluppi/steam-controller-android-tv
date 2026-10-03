@@ -183,8 +183,6 @@ class UsbConnectionManager(
         }
     }
 
-    val isConnected get() = connection != null
-
     private fun findInEndpoint(iface: UsbInterface): UsbEndpoint? = findEndpoint(iface, UsbConstants.USB_DIR_IN)
 
     private fun findOutEndpoint(iface: UsbInterface): UsbEndpoint? = findEndpoint(iface, UsbConstants.USB_DIR_OUT)

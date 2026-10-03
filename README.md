@@ -86,7 +86,7 @@ for ble, the standard hid service (`0x1812`) is claimed by the os, so the app ta
 
 ## build
 
-standard android gradle build. needs android studio hedgehog or newer, android gradle plugin 8.5+, kotlin 2.0+, and the ndk with cmake 3.22.1 for the native jni library.
+standard android gradle build. needs android studio ladybug or newer, android gradle plugin 8.7+, kotlin 2.0+, and the ndk with cmake 3.22.1 for the native jni library.
 
 the gradle wrapper is committed, so android studio or the command line both work:
 
@@ -158,6 +158,7 @@ debug builds install side by side with a release build (`applicationIdSuffix = "
 - the [linux kernel `hid-steam` driver](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-steam.c) for additional validation of button bit positions and the rumble command structure
 - [shizuku](https://github.com/RikkaApps/Shizuku) by rikkaapps - the `uinput` access path without root
 - the [android usb host api](https://developer.android.com/guide/topics/connectivity/usb/host) and the ble gatt stack
+- [kenney input prompts](https://kenney.nl/assets/input-prompts) (cc0) - the button glyphs on the mapping screen
 - [material components for android](https://github.com/material-components/material-components-android) for the material 3 ui
 
 ## license

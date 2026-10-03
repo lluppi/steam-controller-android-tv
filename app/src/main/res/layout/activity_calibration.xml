@@ -2,11 +2,7 @@
 <!--
   CalibrationActivity - one layout for every form factor.
 
-  Was three near-copies at 405 / 405 / 399 lines that between them used exactly one custom
-  style. Every colour, text size, padding and corner radius was written out by hand per
-  variant, which is why this screen drifted furthest from the rest of the app.
-
-  Now: four cards on the shared tokens, one column on a handheld and a 2x2 grid on a wide
+  Four cards on the shared tokens, one column on a handheld and a 2x2 grid on a wide
   screen (Calib.Columns, overridden in values-television/styles.xml). The columns are equal
   height; the cards inside them are not - sticks + rumble down one side, gyro + desktop down
   the other, which is roughly what they weigh.

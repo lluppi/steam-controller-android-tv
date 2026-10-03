@@ -74,10 +74,8 @@ object SteamReportParser {
             rightJoyY = readInt16LE(report, 16),
             leftPadX = readInt16LE(report, 18),
             leftPadY = readInt16LE(report, 20),
-            leftPadContact = readUInt16LE(report, 22),
             rightPadX = readInt16LE(report, 24),
             rightPadY = readInt16LE(report, 26),
-            rightPadContact = readUInt16LE(report, 28),
             quatW = readInt16LE(report, 32),
             quatX = readInt16LE(report, 34),
             quatY = readInt16LE(report, 36),
@@ -97,9 +95,5 @@ object SteamReportParser {
     private fun readUInt16LE(
         buf: ByteArray,
         offset: Int,
-    ): Int {
-        val lo = buf[offset].toInt() and 0xFF
-        val hi = buf[offset + 1].toInt() and 0xFF
-        return (hi shl 8) or lo
-    }
+    ): Int = readInt16LE(buf, offset).toInt() and 0xFFFF
 }

@@ -1,6 +1,7 @@
 package com.steamcontroller.android
 
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.widget.TextView
 import android.widget.Toast
@@ -78,19 +79,15 @@ class DebugActivity : AppCompatActivity() {
     private fun updateButtons(s: SteamControllerState) {
         /**
          * Toggles a chip's background + text colour to reflect button state.
-         * V1.2 chips come in two shapes - rectangular pill (system/grips/back) and
-         * circular (face buttons, DPAD, stick clicks). We pick the right drawable
-         * pair based on `circular`.
+         * Chips come in two shapes - rectangular pill (system/grips/back) and circular
+         * (face buttons, DPAD, stick clicks); the pressed state is a tint over the shape.
          */
         fun chip(tv: TextView, mask: Int, circular: Boolean = false) {
             val active = s.isButtonPressed(mask)
-            val bg = when {
-                circular && active -> R.drawable.chip_circle_bg_active
-                circular -> R.drawable.chip_circle_bg
-                !circular && active -> R.drawable.chip_bg_active
-                else -> R.drawable.chip_bg
-            }
-            tv.setBackgroundResource(bg)
+            // Same resource every frame after the first, which setBackgroundResource skips.
+            tv.setBackgroundResource(if (circular) R.drawable.chip_circle_bg else R.drawable.chip_bg)
+            tv.backgroundTintList =
+                ColorStateList.valueOf(getColor(if (active) R.color.accent else R.color.surface_3))
             tv.setTextColor(getColor(if (active) android.R.color.black else R.color.chip_inactive))
         }
         chip(binding.btnA, Buttons.A, circular = true)
@@ -125,10 +122,8 @@ class DebugActivity : AppCompatActivity() {
         binding.tvRT.text = s.rightTrigger.toString()
 
         // Sticks - raw is ±32767 (Int16). Centre the bar by offsetting +32768 against max=65535.
-        // ProgressBars are phone-layout-only; sw600dp / TV variants don't have them yet, so
-        // the binding fields are nullable - use safe calls.
-        fun setSignedBar(progressView: android.widget.ProgressBar?, raw: Int) {
-            progressView?.progress = (raw + 32768).coerceIn(0, 65535)
+        fun setSignedBar(progressView: android.widget.ProgressBar, raw: Int) {
+            progressView.progress = (raw + 32768).coerceIn(0, 65535)
         }
         setSignedBar(binding.pbLSX, s.leftJoyX.toInt())
         setSignedBar(binding.pbLSY, s.leftJoyY.toInt())

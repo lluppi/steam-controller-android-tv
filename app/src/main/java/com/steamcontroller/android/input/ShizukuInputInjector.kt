@@ -101,6 +101,4 @@ class ShizukuInputInjector {
             Log.e(TAG, "Inject failed: ${e.message}")
         }
     }
-
-    val isReady get() = inputManager != null && injectMethod != null
 }

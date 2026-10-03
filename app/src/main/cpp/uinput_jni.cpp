@@ -12,7 +12,6 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <string.h>
 
 namespace {
 
@@ -51,9 +50,9 @@ size_t appendDetail(size_t offset, const char* format, ...) {
     return next < sizeof(g_detail) ? next : sizeof(g_detail) - 1;
 }
 
-// Probe every candidate so the UI can explain what happened, but only adopt one:
-// `preferred` of PREF_AUTO accepts anything available, otherwise the requested backend.
-void selectBackend(int preferred) {
+// Probe every candidate so the UI can explain what happened, but only adopt the first
+// usable one in candidate order.
+void selectBackend() {
     // Whatever the previous backend created must not outlive the switch, or a uinput -> uhid
     // change would leave the old devices registered next to the new ones.
     if (g_backend != nullptr) g_backend->destroyDevices();
@@ -64,22 +63,19 @@ void selectBackend(int preferred) {
     for (const Candidate& candidate : CANDIDATES) {
         OutputBackend* backend = candidate.factory();
         const bool available = backend->probe();
-        const bool wanted = (preferred == PREF_AUTO) || (preferred == candidate.id);
 
         offset = appendDetail(offset, "%s/dev/%s: %s",
                               offset ? ", " : "", backend->name(),
                               available ? "ok" : backend->probeDetail());
 
-        if (available && wanted && g_backend == nullptr) {
+        if (available && g_backend == nullptr) {
             g_backend = backend;
             g_backend_id = candidate.id;
         }
     }
 
     if (g_backend == nullptr) {
-        appendDetail(offset, preferred == PREF_AUTO
-                                 ? " — no usable backend"
-                                 : " — requested backend unavailable");
+        appendDetail(offset, " — no usable backend");
     }
     LOGI("backend=%s — %s", g_backend ? g_backend->name() : "none", g_detail);
 }
@@ -87,15 +83,9 @@ void selectBackend(int preferred) {
 }  // namespace
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_steamcontroller_android_uinput_UInputNative_selectBackend(JNIEnv*, jclass, jint preferred) {
+Java_com_steamcontroller_android_uinput_UInputNative_selectBackend(JNIEnv*, jclass) {
     std::lock_guard<std::mutex> lock(g_lock);
-    selectBackend(preferred);
-    return g_backend_id;
-}
-
-extern "C" JNIEXPORT jint JNICALL
-Java_com_steamcontroller_android_uinput_UInputNative_currentBackend(JNIEnv*, jclass) {
-    std::lock_guard<std::mutex> lock(g_lock);
+    selectBackend();
     return g_backend_id;
 }
 

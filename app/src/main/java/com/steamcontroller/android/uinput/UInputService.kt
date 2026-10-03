@@ -90,22 +90,12 @@ class UInputService : IUInputService.Stub {
         lastCallAt.set(SystemClock.uptimeMillis())
     }
 
-    override fun selectBackend(preferred: Int): Int {
+    override fun selectBackend(): Int {
         touch()
         return try {
-            UInputNative.selectBackend(preferred)
+            UInputNative.selectBackend()
         } catch (t: Throwable) {
             Log.e(TAG, "selectBackend failed: ${t.message}")
-            UInputNative.Backend.NONE
-        }
-    }
-
-    override fun getBackend(): Int {
-        touch()
-        return try {
-            UInputNative.currentBackend()
-        } catch (t: Throwable) {
-            Log.e(TAG, "getBackend failed: ${t.message}")
             UInputNative.Backend.NONE
         }
     }

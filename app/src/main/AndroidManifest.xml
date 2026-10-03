@@ -30,7 +30,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
 
-    <!-- Auto-switch profile when the foreground app changes (V1.2 Phase 2b).
+    <!-- Auto-switch profile when the foreground app changes.
          Special-access permission, granted via Settings → Usage data access. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />

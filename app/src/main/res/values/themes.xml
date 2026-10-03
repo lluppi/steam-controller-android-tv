@@ -19,10 +19,10 @@
         <item name="colorOnSecondaryContainer">@color/accent_on_container</item>
 
         <!-- Tertiary: mint, for "live" affordances. -->
-        <item name="colorTertiary">@color/ok_on_container</item>
+        <item name="colorTertiary">@color/status_connected_on_container</item>
         <item name="colorOnTertiary">@color/accent_on</item>
-        <item name="colorTertiaryContainer">@color/ok_container</item>
-        <item name="colorOnTertiaryContainer">@color/ok_on_container</item>
+        <item name="colorTertiaryContainer">@color/status_connected_container</item>
+        <item name="colorOnTertiaryContainer">@color/status_connected_on_container</item>
 
         <!-- Error -->
         <item name="colorError">@color/error_on_container</item>

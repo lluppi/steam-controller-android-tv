@@ -17,13 +17,6 @@ object UInputNative {
         const val UHID = 2
     }
 
-    /** Requested backend for [selectBackend] - must match BackendPref in cpp/output_backend.h. */
-    object Pref {
-        const val AUTO = 0
-        const val UINPUT = 1
-        const val UHID = 2
-    }
-
     /** Display name for a [Backend] id - used in logs and the UI. */
     fun backendName(id: Int): String = when (id) {
         Backend.UINPUT -> "uinput"
@@ -32,9 +25,7 @@ object UInputNative {
     }
 
     /** Probe the backends and adopt one. Returns the chosen [Backend] id. */
-    external fun selectBackend(preferred: Int): Int
-
-    external fun currentBackend(): Int
+    external fun selectBackend(): Int
 
     /** Probe result for every backend, e.g. "/dev/uinput: Permission denied, /dev/uhid: ok". */
     external fun backendDetail(): String

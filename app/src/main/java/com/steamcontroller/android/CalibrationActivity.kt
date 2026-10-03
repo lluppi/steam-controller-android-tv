@@ -3,6 +3,8 @@ package com.steamcontroller.android
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
+import android.widget.CompoundButton
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -77,95 +79,68 @@ class CalibrationActivity : AppCompatActivity() {
         }
 
         // Rumble intensity slider - applied live to all subsequent rumble events
-        val savedIntensity = Prefs.getRumbleIntensity(this)
-        binding.sliderRumbleIntensity.value = savedIntensity.toFloat()
-        binding.tvRumbleIntensity.text = "$savedIntensity%"
-        binding.sliderRumbleIntensity.addOnChangeListener(
-            Slider.OnChangeListener { _, value, _ ->
-                val pct = value.toInt()
-                binding.tvRumbleIntensity.text = "$pct%"
-                Prefs.setRumbleIntensity(this, pct)
-            }
-        )
+        bindSlider(
+            binding.sliderRumbleIntensity,
+            binding.tvRumbleIntensity,
+            Prefs.getRumbleIntensity(this).toFloat(),
+            { "${it.toInt()}%" },
+        ) { Prefs.setRumbleIntensity(this, it.toInt()) }
 
         // Mouse sensitivity slider - only relevant in Desktop profile but always visible
-        val savedSens = Prefs.getMouseSensitivity(this)
-        binding.sliderMouseSensitivity.value = savedSens
-        binding.tvMouseSensitivity.text = "%.1f×".format(savedSens)
-        binding.sliderMouseSensitivity.addOnChangeListener(
-            Slider.OnChangeListener { _, value, _ ->
-                binding.tvMouseSensitivity.text = "%.1f×".format(value)
-                Prefs.setMouseSensitivity(this, value)
-            }
-        )
+        bindSlider(
+            binding.sliderMouseSensitivity,
+            binding.tvMouseSensitivity,
+            Prefs.getMouseSensitivity(this),
+            { "%.1f×".format(it) },
+        ) { Prefs.setMouseSensitivity(this, it) }
 
         // Trackpads-as-mouse toggle for gamepad mode.
         // UInputGamepad re-reads the pref at most every 250ms so flipping it is
         // effectively live without restarting the service.
-        binding.switchTrackpadAsMouse.isChecked = Prefs.getTrackpadAsMouseInGamepad(this)
-        binding.switchTrackpadAsMouse.setOnCheckedChangeListener { _, checked ->
-            Prefs.setTrackpadAsMouseInGamepad(this, checked)
+        bindSwitch(binding.switchTrackpadAsMouse, Prefs.getTrackpadAsMouseInGamepad(this)) {
+            Prefs.setTrackpadAsMouseInGamepad(this, it)
         }
-
-        binding.switchStartOnBoot.isChecked = Prefs.getStartOnBoot(this)
-        binding.switchStartOnBoot.setOnCheckedChangeListener { _, checked ->
-            Prefs.setStartOnBoot(this, checked)
+        bindSwitch(binding.switchStartOnBoot, Prefs.getStartOnBoot(this)) {
+            Prefs.setStartOnBoot(this, it)
         }
-        binding.switchStartOnConnect.isChecked = Prefs.getStartOnControllerConnect(this)
-        binding.switchStartOnConnect.setOnCheckedChangeListener { _, checked ->
-            Prefs.setStartOnControllerConnect(this, checked)
+        bindSwitch(binding.switchStartOnConnect, Prefs.getStartOnControllerConnect(this)) {
+            Prefs.setStartOnControllerConnect(this, it)
         }
 
         val gyroControls = binding.gyroControls
-        gyroControls.switchGyroEnabled.isChecked = Prefs.getGyroEnabled(this)
-        gyroControls.switchGyroEnabled.setOnCheckedChangeListener { _, checked ->
-            Prefs.setGyroEnabled(this, checked)
+        bindSwitch(gyroControls.switchGyroEnabled, Prefs.getGyroEnabled(this)) {
+            Prefs.setGyroEnabled(this, it)
         }
-        val gyroSensitivity = Prefs.getGyroSensitivity(this)
-        gyroControls.sliderGyroSensitivity.value = gyroSensitivity
-        gyroControls.tvGyroSensitivity.text = "%.1f× horizontal".format(gyroSensitivity)
-        gyroControls.sliderGyroSensitivity.addOnChangeListener(
-            Slider.OnChangeListener { _, value, _ ->
-                gyroControls.tvGyroSensitivity.text = "%.1f× horizontal".format(value)
-                Prefs.setGyroSensitivity(this, value)
-            }
-        )
-        val gyroSensitivityY = Prefs.getGyroSensitivityY(this)
-        gyroControls.sliderGyroSensitivityY.value = gyroSensitivityY
-        gyroControls.tvGyroSensitivityY.text = "%.1f× vertical".format(gyroSensitivityY)
-        gyroControls.sliderGyroSensitivityY.addOnChangeListener(
-            Slider.OnChangeListener { _, value, _ ->
-                gyroControls.tvGyroSensitivityY.text = "%.1f× vertical".format(value)
-                Prefs.setGyroSensitivityY(this, value)
-            }
-        )
-        val gyroSmoothing = Prefs.getGyroSmoothing(this)
-        gyroControls.sliderGyroSmoothing.value = gyroSmoothing
-        gyroControls.tvGyroSmoothing.text = "%.0f%% smoothing".format(gyroSmoothing * 100f)
-        gyroControls.sliderGyroSmoothing.addOnChangeListener(
-            Slider.OnChangeListener { _, value, _ ->
-                gyroControls.tvGyroSmoothing.text = "%.0f%% smoothing".format(value * 100f)
-                Prefs.setGyroSmoothing(this, value)
-            }
-        )
-        val gyroDeadzone = Prefs.getGyroDeadzone(this)
-        gyroControls.sliderGyroDeadzone.value = gyroDeadzone
-        gyroControls.tvGyroDeadzone.text = "%.3f rad/s deadzone".format(gyroDeadzone)
-        gyroControls.sliderGyroDeadzone.addOnChangeListener(
-            Slider.OnChangeListener { _, value, _ ->
-                gyroControls.tvGyroDeadzone.text = "%.3f rad/s deadzone".format(value)
-                Prefs.setGyroDeadzone(this, value)
-            }
-        )
-        val gyroResponse = Prefs.getGyroResponse(this)
-        gyroControls.sliderGyroResponse.value = gyroResponse
-        gyroControls.tvGyroResponse.text = "%.1f response".format(gyroResponse)
-        gyroControls.sliderGyroResponse.addOnChangeListener(
-            Slider.OnChangeListener { _, value, _ ->
-                gyroControls.tvGyroResponse.text = "%.1f response".format(value)
-                Prefs.setGyroResponse(this, value)
-            }
-        )
+        bindSlider(
+            gyroControls.sliderGyroSensitivity,
+            gyroControls.tvGyroSensitivity,
+            Prefs.getGyroSensitivity(this),
+            { "%.1f× horizontal".format(it) },
+        ) { Prefs.setGyroSensitivity(this, it) }
+        bindSlider(
+            gyroControls.sliderGyroSensitivityY,
+            gyroControls.tvGyroSensitivityY,
+            Prefs.getGyroSensitivityY(this),
+            { "%.1f× vertical".format(it) },
+        ) { Prefs.setGyroSensitivityY(this, it) }
+        bindSlider(
+            gyroControls.sliderGyroSmoothing,
+            gyroControls.tvGyroSmoothing,
+            Prefs.getGyroSmoothing(this),
+            { "%.0f%% smoothing".format(it * 100f) },
+        ) { Prefs.setGyroSmoothing(this, it) }
+        bindSlider(
+            gyroControls.sliderGyroDeadzone,
+            gyroControls.tvGyroDeadzone,
+            Prefs.getGyroDeadzone(this),
+            { "%.3f rad/s deadzone".format(it) },
+        ) { Prefs.setGyroDeadzone(this, it) }
+        bindSlider(
+            gyroControls.sliderGyroResponse,
+            gyroControls.tvGyroResponse,
+            Prefs.getGyroResponse(this),
+            { "%.1f response".format(it) },
+        ) { Prefs.setGyroResponse(this, it) }
         gyroControls.btnGyroCalibrate.setOnClickListener {
             if (ControllerService.stateFlow.value == null) {
                 Toast.makeText(this, "Start the service first", Toast.LENGTH_SHORT).show()
@@ -174,9 +149,8 @@ class CalibrationActivity : AppCompatActivity() {
                 gyroControls.btnGyroCalibrate.text = getString(R.string.calib_gyro_calibrating)
             }
         }
-        gyroControls.switchGyroInvertY.isChecked = Prefs.getGyroInvertY(this)
-        gyroControls.switchGyroInvertY.setOnCheckedChangeListener { _, checked ->
-            Prefs.setGyroInvertY(this, checked)
+        bindSwitch(gyroControls.switchGyroInvertY, Prefs.getGyroInvertY(this)) {
+            Prefs.setGyroInvertY(this, it)
         }
         fun renderGyroActivation() {
             val activation = Prefs.getGyroActivation(this)
@@ -273,8 +247,6 @@ class CalibrationActivity : AppCompatActivity() {
             saveRight()
         }
 
-        // V1.2: every layout (phone, sw600dp, TV) exposes a single Calibrate All button.
-        // The old per-stick Set center buttons were removed; their bindings would NPE.
         binding.btnCalibrateAll.setOnClickListener {
             leftCal = leftCal.copy(centerX = lastLeftRawX, centerY = lastLeftRawY)
             rightCal = rightCal.copy(centerX = lastRightRawX, centerY = lastRightRawY)
@@ -284,6 +256,33 @@ class CalibrationActivity : AppCompatActivity() {
                 .makeText(this, "Sticks calibrated", android.widget.Toast.LENGTH_SHORT)
                 .show()
         }
+    }
+
+    /** Seeds a slider + its value label from a saved value, then saves every change live. */
+    private fun bindSlider(
+        slider: Slider,
+        label: TextView,
+        initial: Float,
+        format: (Float) -> String,
+        save: (Float) -> Unit,
+    ) {
+        slider.value = initial
+        label.text = format(initial)
+        slider.addOnChangeListener(
+            Slider.OnChangeListener { _, value, _ ->
+                label.text = format(value)
+                save(value)
+            },
+        )
+    }
+
+    private fun bindSwitch(
+        switch: CompoundButton,
+        initial: Boolean,
+        save: (Boolean) -> Unit,
+    ) {
+        switch.isChecked = initial
+        switch.setOnCheckedChangeListener { _, checked -> save(checked) }
     }
 
     private fun saveLeft() = Prefs.setLeftCalibration(this, leftCal)

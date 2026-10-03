@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Row layout V1.2 with Kenney input-prompts icons (CC0).
+  Mapping row with Kenney input-prompts icons (CC0).
   Each side (source SC button, target emulated button) is a FrameLayout containing
   BOTH an ImageView (icon) AND a TextView (text fallback). Kotlin picks the right
   one based on whether an icon exists for the value.

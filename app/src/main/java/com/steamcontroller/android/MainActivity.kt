@@ -144,21 +144,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.btnDebug.setOnClickListener {
-            startActivity(Intent(this, DebugActivity::class.java))
-        }
-
-        binding.btnCalibration.setOnClickListener {
-            startActivity(Intent(this, CalibrationActivity::class.java))
-        }
-
-        binding.btnMapping.setOnClickListener {
-            startActivity(Intent(this, MappingActivity::class.java))
-        }
-
-        binding.btnGameProfiles.setOnClickListener {
-            startActivity(Intent(this, ProfilesActivity::class.java))
-        }
+        binding.btnDebug.setOnClickListener { open(DebugActivity::class.java) }
+        binding.btnCalibration.setOnClickListener { open(CalibrationActivity::class.java) }
+        binding.btnMapping.setOnClickListener { open(MappingActivity::class.java) }
+        binding.btnGameProfiles.setOnClickListener { open(ProfilesActivity::class.java) }
 
         setupTransportDropdown()
         setupActionCardFocusMemory()
@@ -341,6 +330,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun open(activity: Class<*>) = startActivity(Intent(this, activity))
+
     private fun refreshBluetoothDevices() {
         val mgr = getSystemService(BluetoothManager::class.java)
         if (mgr?.adapter?.isEnabled != true) {
@@ -350,10 +341,9 @@ class MainActivity : AppCompatActivity() {
         }
         pairedBtDevices = BluetoothHidManager(this).listPairedSteamControllers()
         if (pairedBtDevices.isEmpty()) {
-            binding.dropdownBtDevice.setAdapter(
-                nonFilteringAdapter(listOf("No paired Steam Controller found")),
-            )
-            binding.dropdownBtDevice.setText("No paired Steam Controller found", false)
+            val none = "No paired Steam Controller found"
+            binding.dropdownBtDevice.setAdapter(nonFilteringAdapter(listOf(none)))
+            binding.dropdownBtDevice.setText(none, false)
             log("No Steam Controller paired - pair via Android Bluetooth settings first")
             return
         }
@@ -764,12 +754,6 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Throwable) {
             false
         }
-
-    /**
-     * Drives both the bottom-of-card "Controller: ..." label AND the top status pill colour.
-     * The pill flips to a green tint as soon as HID frames are actually flowing, which is
-     * a much more honest signal than "the user pressed Start".
-     */
 
     /**
      * The status card. Driven by [ControllerService.linkStatusFlow], not by "is the service

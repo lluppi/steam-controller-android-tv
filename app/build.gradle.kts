@@ -90,7 +90,11 @@ android {
         }
 
         release {
-            isMinifyEnabled = false
+            // R8 shrinks the libraries; proguard-rules.pro keeps every app class whole, because
+            // the AIDL stub, the Shizuku user service and the JNI entry points are all looked up
+            // by name.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

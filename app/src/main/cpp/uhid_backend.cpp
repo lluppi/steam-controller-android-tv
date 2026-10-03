@@ -49,20 +49,11 @@ public:
     const char* probeDetail() const override { return detail_; }
 
     bool probe() override {
-        const int fd = ::open(UHID_PATH, O_RDWR | O_CLOEXEC);
-        if (fd < 0) {
-            snprintf(detail_, sizeof(detail_), "%s", strerror(errno));
-            return false;
-        }
-        ::close(fd);
-        snprintf(detail_, sizeof(detail_), "ok");
-        return true;
+        return probe_node(UHID_PATH, O_RDWR, detail_, sizeof(detail_));
     }
 
     bool createDevices(int profileId) override {
-        const gamepad_profile& prof = find_profile(profileId);
-        LOGI("createDevices: profile=%d (VID=0x%04X PID=0x%04X name=\"%s\")",
-             prof.id, prof.vid, prof.pid, prof.name);
+        const gamepad_profile& prof = find_and_log_profile(profileId);
 
         destroyDevices();
 
@@ -79,7 +70,7 @@ public:
 
         // Mouse + keyboard. In Desktop mode both are essential; in gamepad mode they are
         // sidecars, so a failure is logged but doesn't take the gamepad down with it.
-        const bool mouse_ok = create(mouse_, "mouse", "Steam Controller Mouse",
+        const bool mouse_ok = create(mouse_, "mouse", SIDECAR_MOUSE_NAME,
                                      prof.vid, sidecar_mouse_pid(prof),
                                      UHID_MOUSE_RD, sizeof(UHID_MOUSE_RD));
         if (!mouse_ok) {
@@ -89,7 +80,7 @@ public:
         const uint8_t* kbd_rd = desktop ? UHID_KBD_DESKTOP_RD : UHID_KBD_MINIMAL_RD;
         const size_t kbd_rd_size = desktop ? sizeof(UHID_KBD_DESKTOP_RD) : sizeof(UHID_KBD_MINIMAL_RD);
         kbd_minimal_ = !desktop;
-        const bool kbd_ok = create(kbd_, "keyboard", "Steam Controller Keyboard",
+        const bool kbd_ok = create(kbd_, "keyboard", SIDECAR_KEYBOARD_NAME,
                                    prof.vid, sidecar_keyboard_pid(prof), kbd_rd, kbd_rd_size);
         if (!kbd_ok) {
             LOGE("keyboard device creation failed — key mappings will be unavailable");
@@ -360,7 +351,7 @@ private:
             }
             case UHID_SET_REPORT: {
                 // Ack and ignore: none of our descriptors declare an output report the
-                // host is required to act on (rumble would be the one, see PLAN P6).
+                // host is required to act on (rumble would be the one, once it exists).
                 uhid_event reply;
                 memset(&reply, 0, sizeof(reply));
                 reply.type = UHID_SET_REPORT_REPLY;
@@ -371,7 +362,7 @@ private:
             }
             case UHID_OUTPUT:
                 // An output report from a HID driver — the hook rumble would arrive on.
-                // Nothing consumes it yet; logged so the P6 spike has something to read.
+                // Nothing consumes it yet; logged so a rumble implementation can see them.
                 LOGI("%s: UHID_OUTPUT (rtype=%u, %u bytes)", dev.kind, ev.u.output.rtype, ev.u.output.size);
                 break;
             default:

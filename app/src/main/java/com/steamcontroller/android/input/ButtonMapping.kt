@@ -88,7 +88,7 @@ enum class SteamButton(val mask: Int, val displayName: String, val category: But
  *  - `mask > 0`            : regular Xbox button (OR into the gamepad button mask).
  *  - `keyBit >= 0`         : sidecar keyboard key - emitted via the mouse+kbd sidecar
  *                            device that always runs alongside a gamepad profile.
- *                            Bit value matches MouseTarget so we reuse the same JNI path.
+ *                            Bit values come from MouseTarget, the same JNI path desktop mode uses.
  *  - `triggerSide != 0`    : forces an analog trigger axis to max (1=LT, 2=RT) when the
  *                            source is pressed. OR'd with the real analog reading via max().
  *  - `mask < 0` (no other) : special action handled in Kotlin (e.g. SCREENSHOT).
@@ -122,30 +122,32 @@ enum class XboxTarget(
     RT_TRIGGER(-31, "R2 / RT (full press)", triggerSide = 2),
 
     // ── Sidecar keyboard and pointer actions ─────────────────────────────────
-    // keyBit values must match MouseTarget.bit positions (see MouseTarget.kt).
-    KB_UP(-32, "↑ Up", keyBit = 0),
-    KB_DOWN(-33, "↓ Down", keyBit = 1),
-    KB_LEFT(-34, "← Left", keyBit = 2),
-    KB_RIGHT(-35, "→ Right", keyBit = 3),
-    KB_VOLUME_UP(-10, "🔊 Volume +", keyBit = 10),
-    KB_VOLUME_DOWN(-11, "🔉 Volume -", keyBit = 11),
-    KB_PLAY_PAUSE(-12, "⏯ Play / Pause", keyBit = 12),
-    KB_BACK(-13, "⮌ Back", keyBit = 5),
-    KB_HOME(-14, "🏠 Home", keyBit = 8),
-    KB_ENTER(-15, "↵ Enter", keyBit = 4),
-    KB_DPAD_CENTER(-16, "● DPAD Center", keyBit = 15),
-    KB_ESCAPE(-17, "ESC", keyBit = 9),
-    KB_TAB(-18, "⇥ Tab", keyBit = 6),
-    KB_SPACE(-19, "␣ Space", keyBit = 7),
-    KB_BACKSPACE(-20, "⌫ Backspace", keyBit = 14),
-    KB_MENU(-21, "☰ Menu (context)", keyBit = 13),
-    MOUSE_LEFT(-36, "🖱 Left click", keyBit = 16),
-    MOUSE_RIGHT(-37, "🖱 Right click", keyBit = 17),
-    MOUSE_MIDDLE(-38, "🖱 Middle click", keyBit = 18),
+    KB_UP(-32, "↑ Up", keyBit = MouseTarget.KEY_UP.bit),
+    KB_DOWN(-33, "↓ Down", keyBit = MouseTarget.KEY_DOWN.bit),
+    KB_LEFT(-34, "← Left", keyBit = MouseTarget.KEY_LEFT.bit),
+    KB_RIGHT(-35, "→ Right", keyBit = MouseTarget.KEY_RIGHT.bit),
+    KB_VOLUME_UP(-10, "🔊 Volume +", keyBit = MouseTarget.KEY_VOLUME_UP.bit),
+    KB_VOLUME_DOWN(-11, "🔉 Volume -", keyBit = MouseTarget.KEY_VOLUME_DOWN.bit),
+    KB_PLAY_PAUSE(-12, "⏯ Play / Pause", keyBit = MouseTarget.KEY_PLAY_PAUSE.bit),
+    KB_BACK(-13, "⮌ Back", keyBit = MouseTarget.KEY_BACK.bit),
+    KB_HOME(-14, "🏠 Home", keyBit = MouseTarget.KEY_HOME.bit),
+    KB_ENTER(-15, "↵ Enter", keyBit = MouseTarget.KEY_ENTER.bit),
+    KB_DPAD_CENTER(-16, "● DPAD Center", keyBit = MouseTarget.KEY_DPAD_CENTER.bit),
+    KB_ESCAPE(-17, "ESC", keyBit = MouseTarget.KEY_ESC.bit),
+    KB_TAB(-18, "⇥ Tab", keyBit = MouseTarget.KEY_TAB.bit),
+    KB_SPACE(-19, "␣ Space", keyBit = MouseTarget.KEY_SPACE.bit),
+    KB_BACKSPACE(-20, "⌫ Backspace", keyBit = MouseTarget.KEY_BACKSPACE.bit),
+    KB_MENU(-21, "☰ Menu (context)", keyBit = MouseTarget.KEY_MENU.bit),
+    MOUSE_LEFT(-36, "🖱 Left click", keyBit = MouseTarget.BTN_LEFT.bit),
+    MOUSE_RIGHT(-37, "🖱 Right click", keyBit = MouseTarget.BTN_RIGHT.bit),
+    MOUSE_MIDDLE(-38, "🖱 Middle click", keyBit = MouseTarget.BTN_MIDDLE.bit),
 
     // Special actions (mask < 0, no keyBit). Edge-triggered on press in Kotlin.
     SCREENSHOT(-1, "📸 Take screenshot"),
     GUIDE_LAYER(-2, "Guide tap / action layer hold");
+
+    /** Handled in Kotlin rather than emitted as a button, key or trigger. */
+    val isSpecialAction: Boolean get() = mask < 0 && keyBit < 0 && triggerSide == 0
 
     companion object {
         // Exact order used by releases that persisted enum ordinals. New entries must never be

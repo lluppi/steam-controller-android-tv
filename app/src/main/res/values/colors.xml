@@ -25,11 +25,7 @@
     <color name="text_mid">#A9BECE</color>
     <color name="text_low">#6C8093</color>
 
-    <!-- State colours: mint for live, amber for "not ready yet". -->
-    <color name="ok_container">#0F3323</color>
-    <color name="ok_on_container">#7BEBA8</color>
-    <color name="warn_container">#3A2E12</color>
-    <color name="warn_on_container">#F5D08A</color>
+    <!-- Error state colours. Live / not-ready-yet are the status_* colours below. -->
     <color name="error_container">#3A1D22</color>
     <color name="error_on_container">#FFA6A6</color>
 
