@@ -744,9 +744,14 @@ class ControllerService : Service() {
             lastFrameAt = nowMs
             if (_serviceStateFlow.value.link.state != LinkState.LINKED) refreshLinkStatus()
 
-            // Diagnostic: the left trackpad click does not show up in the button field at all
-            // (the mask is unchanged across left-pad clicks), so dump the whole state report
-            // whenever the mask changes. Diffing these against a click identifies the byte.
+            updateReportRate(nowMs)
+
+            // Input delivery is the latency-critical path. Diagnostics and controller haptics
+            // happen afterwards so a log format or USB output write cannot delay this frame.
+            handleState(state)
+            if (initializedTransport == Transport.USB) updateUsbTrackpadHaptics(state, nowMs)
+
+            // Diagnostic: dump the whole report on button changes, but only after injection.
             if (BuildConfig.DEBUG &&
                 (state.buttons != lastRawLogButtons || nowMs - lastRawLogMs > 5000L)
             ) {
@@ -758,10 +763,6 @@ class ControllerService : Service() {
                         raw.joinToString(" ") { "%02x".format(it) },
                 )
             }
-
-            updateReportRate(nowMs)
-            if (initializedTransport == Transport.USB) updateUsbTrackpadHaptics(state, nowMs)
-            handleState(state)
         }
 
         // Dedicated battery/charge report (id 0x43) - works on both USB and BT, percent is

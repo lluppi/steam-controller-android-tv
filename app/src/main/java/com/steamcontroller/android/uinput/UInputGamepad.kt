@@ -21,13 +21,16 @@ import com.steamcontroller.android.input.SystemActions
 import com.steamcontroller.android.input.XboxTarget
 import com.steamcontroller.android.parser.Buttons
 import com.steamcontroller.android.parser.SteamControllerState
-import kotlin.math.abs
 import rikka.shizuku.Shizuku
+import kotlin.math.abs
 
 // High-level Kotlin API for the virtual gamepad + mouse/keyboard sidecar.
 // Binds UInputService through Shizuku, translates SC2026 state into frames, and reports
 // which output backend the shell-UID process ended up using (uinput or uhid).
-class UInputGamepad(private val context: Context, initialProfile: GamepadProfile) {
+class UInputGamepad(
+    private val context: Context,
+    initialProfile: GamepadProfile,
+) {
     private val TAG = "UInputGamepad"
 
     companion object {
@@ -46,7 +49,10 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         private var candidate = false
         private var candidateSinceMs = 0L
 
-        fun update(value: Int, nowMs: Long): Boolean {
+        fun update(
+            value: Int,
+            nowMs: Long,
+        ): Boolean {
             val next = value >= if (pressed) TRIGGER_RELEASE_THRESHOLD else TRIGGER_PRESS_THRESHOLD
             if (next != candidate) {
                 candidate = next
@@ -158,7 +164,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     private val args =
         Shizuku
             .UserServiceArgs(
-                ComponentName(context.packageName, UInputService::class.java.name)
+                ComponentName(context.packageName, UInputService::class.java.name),
             ).daemon(false)
             .processNameSuffix("uinput")
             .debuggable(false)
@@ -170,7 +176,10 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
 
     private val connection =
         object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+            override fun onServiceConnected(
+                name: ComponentName?,
+                binder: IBinder?,
+            ) {
                 val svc = IUInputService.Stub.asInterface(binder)
                 service = svc
                 Log.i(TAG, "UInputService connected")
@@ -259,7 +268,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
                 val current =
                     try {
                         svc.runShellCommandForOutput(
-                            arrayOf("settings", "get", "secure", "show_ime_with_hard_keyboard")
+                            arrayOf("settings", "get", "secure", "show_ime_with_hard_keyboard"),
                         )
                     } catch (_: Throwable) {
                         null
@@ -269,7 +278,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
                 Prefs.setSavedShowImeHardKeyboard(context, toSave)
             }
             svc.runShellCommand(
-                arrayOf("settings", "put", "secure", "show_ime_with_hard_keyboard", "1")
+                arrayOf("settings", "put", "secure", "show_ime_with_hard_keyboard", "1"),
             )
             Log.i(TAG, "show_ime_with_hard_keyboard forced on")
         } catch (t: Throwable) {
@@ -282,11 +291,11 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
             val saved = Prefs.getSavedShowImeHardKeyboard(context) ?: return
             if (saved == SHOW_IME_UNSET_SENTINEL) {
                 svc.runShellCommand(
-                    arrayOf("settings", "delete", "secure", "show_ime_with_hard_keyboard")
+                    arrayOf("settings", "delete", "secure", "show_ime_with_hard_keyboard"),
                 )
             } else {
                 svc.runShellCommand(
-                    arrayOf("settings", "put", "secure", "show_ime_with_hard_keyboard", saved)
+                    arrayOf("settings", "put", "secure", "show_ime_with_hard_keyboard", saved),
                 )
             }
             Prefs.clearSavedShowImeHardKeyboard(context)
@@ -482,7 +491,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
                     state.quatY,
                     state.quatZ,
                     now,
-                    cachedGyroTuning
+                    cachedGyroTuning,
                 )
                 rx = (rx + gyro.stickX).coerceIn(-32767, 32767)
                 val gyroY = if (cachedGyroInvertY) -gyro.stickY else gyro.stickY
@@ -504,7 +513,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
                 lt,
                 rt,
                 dpadX,
-                dpadY
+                dpadY,
             )
         } catch (t: Throwable) {
             Log.e(TAG, "sendFrame IPC failed: ${t.message}")
@@ -526,7 +535,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
     private fun pushSidecarFrame(
         svc: IUInputService,
         state: SteamControllerState,
-        mappedKeys: Int
+        mappedKeys: Int,
     ) {
         val (relX, relY, scrollTicks) =
             if (cachedTrackpadAsMouse) {
@@ -549,10 +558,14 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
             (
                 state.isButtonPressed(MOUSE_LEFT_PAD_CLICK_BIT) ||
                     state.isButtonPressed(MOUSE_RIGHT_PAD_CLICK_BIT)
-                )
+            )
         ) {
             keys = keys or (1 shl MouseTarget.BTN_LEFT.bit)
         }
+
+        // Deliver the sidecar frame before formatting diagnostics so debug logging never sits
+        // between a physical pad event and the virtual mouse or keyboard report.
+        sendMouseFrameIfChanged(svc, relX, relY, scrollTicks, keys, state.buttons)
 
         val nowMs = android.os.SystemClock.uptimeMillis()
         if (BuildConfig.DEBUG &&
@@ -567,10 +580,9 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
                     "touchLt=${state.isButtonPressed(Buttons.TP_LT)} " +
                     "padXY=(${state.rightPadX},${state.rightPadY}) " +
                     "rel=($relX,$relY) scroll=$scrollTicks keys=$keys " +
-                    "buttons=0x${state.buttons.toString(16)}'"
+                    "buttons=0x${state.buttons.toString(16)}'",
             )
         }
-        sendMouseFrameIfChanged(svc, relX, relY, scrollTicks, keys, state.buttons)
     }
 
     /**
@@ -589,7 +601,7 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
         relY: Int,
         scrollTicks: Int,
         keys: Int,
-        mask: Int
+        mask: Int,
     ) {
         if (relX == 0 && relY == 0 && scrollTicks == 0 && keys == lastSentKeys) return
         lastSentKeys = keys
@@ -678,7 +690,10 @@ class UInputGamepad(private val context: Context, initialProfile: GamepadProfile
      * face/system buttons → mapped keys, DPAD → arrow keys, left pad click → right mouse.
      * Special actions (e.g. SCREENSHOT) still fire via the gamepad mapping.
      */
-    private fun pushMouseFrame(svc: IUInputService, state: SteamControllerState) {
+    private fun pushMouseFrame(
+        svc: IUInputService,
+        state: SteamControllerState,
+    ) {
         // Right trackpad → cursor delta; left trackpad vertical → scroll wheel.
         // Same helpers as the gamepad sidecar mode so the gesture is identical.
         val (relX, relY) = computeRightPadDelta(state)
